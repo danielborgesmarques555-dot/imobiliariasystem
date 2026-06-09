@@ -1,0 +1,869 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Regis Imobiliaria</title>
+    <link rel="stylesheet" href="styles.css?v=20260608f" />
+  </head>
+  <body class="public-mode">
+    <section class="site-shell" id="site-publico" aria-label="Site publico da imobiliaria">
+      <header class="site-header">
+        <a class="site-brand" href="#site-publico" aria-label="Regis Imobiliaria">
+          <span class="site-brand-logo" data-public-logo>RI</span>
+          <span>
+            <strong data-public-company-name>Regis Imobiliaria</strong>
+            <small data-public-creci>CRECI 6210</small>
+          </span>
+        </a>
+        <nav class="site-nav" aria-label="Navegacao do site">
+          <a href="#site-imoveis">Imoveis</a>
+          <a href="#site-contato">Contato</a>
+          <button class="site-login-button" type="button" data-open-login>Area do corretor</button>
+        </nav>
+      </header>
+
+      <main>
+        <section class="site-hero">
+          <div class="site-hero-copy">
+            <p class="eyebrow">Registro e regiao</p>
+            <h1 data-public-hero-title>Regis Imobiliaria</h1>
+            <p>Imoveis disponiveis atualizados direto pelo sistema interno da imobiliaria.</p>
+            <div class="site-hero-actions">
+              <a class="submit-button" href="#site-imoveis">Ver imoveis</a>
+              <a class="secondary-button" href="#site-contato">Falar com a equipe</a>
+            </div>
+          </div>
+          <div class="site-hero-media" id="site-hero-media" aria-label="Imovel em destaque"></div>
+        </section>
+
+        <section class="site-search-band" aria-label="Filtros de busca">
+          <label>
+            Buscar
+            <input type="search" placeholder="Cidade, bairro, tipo ou codigo" data-public-filter="query" />
+          </label>
+          <label>
+            Finalidade
+            <select data-public-filter="purpose">
+              <option value="all">Todas</option>
+              <option value="Venda">Venda</option>
+              <option value="Locacao">Locacao</option>
+            </select>
+          </label>
+          <label>
+            Cidade
+            <select data-public-filter="city">
+              <option value="all">Todas</option>
+            </select>
+          </label>
+          <label>
+            Tipo
+            <select data-public-filter="type">
+              <option value="all">Todos</option>
+            </select>
+          </label>
+          <label>
+            Valor maximo
+            <input type="number" min="0" step="1000" placeholder="Sem limite" data-public-filter="maxPrice" />
+          </label>
+        </section>
+
+        <section class="site-section" id="site-imoveis">
+          <div class="site-section-head">
+            <div>
+              <p class="eyebrow">Vitrine</p>
+              <h2>Imoveis disponiveis</h2>
+            </div>
+            <span class="site-count" id="site-property-count">0 imoveis</span>
+          </div>
+          <div class="site-property-grid" id="site-property-list"></div>
+        </section>
+
+        <section class="site-contact" id="site-contato">
+          <div>
+            <p class="eyebrow">Atendimento</p>
+            <h2>Encontrou um imovel interessante?</h2>
+            <p>Envie uma mensagem com o codigo ou nome do imovel para a equipe retornar com visita, proposta e detalhes da documentacao.</p>
+          </div>
+          <div class="site-contact-actions">
+            <a class="submit-button" href="#" data-public-whatsapp>Chamar no WhatsApp</a>
+            <a class="secondary-button" href="mailto:" data-public-email>Enviar email</a>
+          </div>
+        </section>
+      </main>
+    </section>
+
+    <aside class="sidebar" aria-label="Menu principal">
+      <a class="brand" href="#painel" aria-label="Regis Imobiliaria">
+        <span class="brand-empty">Sem logo</span>
+      </a>
+
+      <nav class="nav">
+        <a class="nav-link active" href="#painel" data-view-link="painel">
+          <span aria-hidden="true">⌂</span>
+          <span>Painel</span>
+        </a>
+        <a class="nav-link" href="#cadastro" data-view-link="cadastro">
+          <span aria-hidden="true">+</span>
+          <span>Cadastro</span>
+        </a>
+        <a class="nav-link" href="#imoveis" data-view-link="imoveis">
+          <span aria-hidden="true">▦</span>
+          <span>Imoveis</span>
+        </a>
+        <a class="nav-link" href="#clientes" data-view-link="clientes">
+          <span aria-hidden="true">◎</span>
+          <span>Clientes</span>
+        </a>
+        <a class="nav-link" href="#proprietarios" data-view-link="proprietarios">
+          <span aria-hidden="true">PR</span>
+          <span>Proprietarios</span>
+        </a>
+        <a class="nav-link" href="#contratos" data-view-link="contratos">
+          <span aria-hidden="true">▤</span>
+          <span>Contratos</span>
+        </a>
+        <a class="nav-link" href="#agendamentos" data-view-link="agendamentos">
+          <span aria-hidden="true">AG</span>
+          <span>Agendamentos</span>
+        </a>
+        <a class="nav-link" href="#faturas" data-view-link="faturas">
+          <span aria-hidden="true">R$</span>
+          <span>Faturas</span>
+        </a>
+        <a class="nav-link" href="#configuracao" data-view-link="configuracao">
+          <span aria-hidden="true">⚙</span>
+          <span>Config</span>
+        </a>
+      </nav>
+    </aside>
+
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Creci 6210</p>
+          <h1>Regis Imobiliaria</h1>
+        </div>
+        <div class="top-actions">
+          <button class="icon-button" type="button" title="Buscar" aria-label="Buscar">
+            ⌕
+          </button>
+          <button class="primary-action" type="button" data-scroll-target="property-form">
+            Novo imovel
+          </button>
+          <button class="primary-action logout-button" type="button" data-logout>
+            Sair
+          </button>
+        </div>
+      </header>
+
+      <section class="view active" id="painel" data-view="painel" aria-label="Painel">
+        <div class="list-header">
+          <div>
+            <p class="eyebrow">Relatorios</p>
+            <h2>Painel geral</h2>
+          </div>
+        </div>
+        <div class="dashboard-report-grid" id="dashboard-report-grid"></div>
+      </section>
+
+      <section class="view" id="cadastro" data-view="cadastro" aria-label="Cadastro">
+        <div class="cadastro-layout">
+          <section class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Operacao</p>
+              </div>
+              <div class="segmented-control" role="tablist" aria-label="Tipo de cadastro">
+                <button class="segment active" type="button" data-form-tab="owner">Proprietario</button>
+                <button class="segment" type="button" data-form-tab="property">Imovel</button>
+                <button class="segment" type="button" data-form-tab="client">Cliente</button>
+              </div>
+            </div>
+
+            <form class="form-grid" id="property-form" data-form="property">
+              <label>
+                IPTU
+                <input name="iptu" type="number" min="0" step="10" placeholder="1200" />
+              </label>
+              <label>
+                Proprietario do imovel
+                <select name="ownerId" required></select>
+              </label>
+              <label>
+                Titulo do imovel
+                <input name="title" type="text" placeholder="Casa no Centro" required />
+              </label>
+              <label>
+                Tipo
+                <select name="type" required data-property-type>
+                  <option value="Residenciais">Residenciais</option>
+                  <option value="Comerciais">Comerciais</option>
+                  <option value="Terrenos e areas">Terrenos e areas</option>
+                  <option value="Rurais">Rurais</option>
+                  <option value="Temporada e lazer">Temporada e lazer</option>
+                </select>
+              </label>
+              <label>
+                Especificacao
+                <select name="subtype" required data-property-subtype></select>
+              </label>
+              <label>
+                Finalidade
+                <select name="purpose" required>
+                  <option value="Venda">Venda</option>
+                  <option value="Locacao">Locacao</option>
+                </select>
+              </label>
+              <label>
+                Valor
+                <input name="price" type="number" min="0" step="1000" placeholder="350000" required />
+              </label>
+              <label class="full">
+                Localizacao Google Maps
+                <input name="googleLocation" type="text" placeholder="Cole o link do Google Maps ou digite o endereco completo" required />
+              </label>
+              <section class="geo-grid full">
+                <div class="section-title">
+                  <p class="eyebrow">Georreferencia</p>
+                  <h3>Dados para Maps, site e cidades de atuacao</h3>
+                </div>
+                <label>Latitude<input name="latitude" type="number" step="0.000001" placeholder="-24.4973" /></label>
+                <label>Longitude<input name="longitude" type="number" step="0.000001" placeholder="-47.8448" /></label>
+                <label>Cidade detectada<input name="city" type="text" placeholder="Registro" /></label>
+                <label>Bairro/regiao<input name="district" type="text" placeholder="Centro" /></label>
+                <label class="full">Endereco formatado<input name="formattedAddress" type="text" placeholder="Endereco validado pelo Google Maps" /></label>
+                <label class="full">Link do Google Maps<input name="googleMapsUrl" type="url" placeholder="https://maps.google.com/..." /></label>
+                <input name="googlePlaceId" type="hidden" />
+              </section>
+              <label>
+                Quartos
+                <input name="rooms" type="number" min="0" placeholder="3" />
+              </label>
+              <label>
+                Area
+                <input name="area" type="number" min="0" placeholder="120" />
+              </label>
+              <label>
+                Area de lazer?
+                <select name="leisureArea" required>
+                  <option value="Nao">Nao</option>
+                  <option value="Sim">Sim</option>
+                </select>
+              </label>
+              <label>
+                Piscina?
+                <select name="pool" required>
+                  <option value="Nao">Nao</option>
+                  <option value="Sim">Sim</option>
+                </select>
+              </label>
+              <label>
+                Garagem?
+                <select name="garage" required>
+                  <option value="Nao">Nao</option>
+                  <option value="Sim">Sim</option>
+                </select>
+              </label>
+              <label>
+                Vagas de garagem
+                <input name="garageSpaces" type="number" min="0" placeholder="2" />
+              </label>
+              <label class="full">
+                Observacoes
+                <textarea name="notes" rows="3" placeholder="Documentacao, diferenciais e proximos passos"></textarea>
+              </label>
+              <label class="upload-tile full">
+                <input name="documents" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" multiple />
+                <span class="upload-icon">+</span>
+                <strong>Adicionar documentos do imovel</strong>
+                <small>Contratos, matriculas, IPTU ou fotos de documentos.</small>
+              </label>
+              <div class="file-preview full" id="property-document-preview" aria-live="polite"></div>
+              <label class="upload-tile full">
+                <input name="photos" type="file" accept="image/*" multiple />
+                <span class="upload-icon">+</span>
+                <strong>Adicionar fotos do imovel</strong>
+                <small>A primeira foto sera a principal. Use ate 8 fotos.</small>
+              </label>
+              <div class="photo-preview full" id="photo-preview" aria-live="polite"></div>
+              <button class="submit-button" type="submit">Cadastrar imovel</button>
+            </form>
+
+            <form class="form-grid" id="client-form" data-form="client">
+              <label>
+                Nome completo
+                <input name="name" type="text" placeholder="Maria Oliveira" required />
+              </label>
+              <label>
+                CPF
+                <input name="cpf" type="text" placeholder="000.000.000-00" required />
+              </label>
+              <label>
+                Nome do contato 1
+                <input name="contact1Name" type="text" placeholder="Maria" required />
+              </label>
+              <label>
+                Contato 1
+                <input name="contact1" type="text" placeholder="(11) 99999-9999" required />
+              </label>
+              <label>
+                Nome do contato 2
+                <input name="contact2Name" type="text" placeholder="Filho, esposa, escritorio" />
+              </label>
+              <label>
+                Contato 2
+                <input name="contact2" type="text" placeholder="Telefone, WhatsApp ou email" />
+              </label>
+              <label class="full">
+                Endereco
+                <input name="address" type="text" placeholder="Rua, numero, bairro e cidade" />
+              </label>
+              <label class="full">
+                Perfil do cliente
+                <textarea name="notes" rows="3" placeholder="Preferencias, urgencia e historico de atendimento"></textarea>
+              </label>
+              <label class="upload-tile full">
+                <input name="documents" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" multiple />
+                <span class="upload-icon">+</span>
+                <strong>Adicionar documentos do cliente</strong>
+                <small>RG, CPF, comprovante de renda, contrato ou proposta.</small>
+              </label>
+              <div class="file-preview full" id="client-document-preview" aria-live="polite"></div>
+              <label class="upload-tile full">
+                <input name="photo" type="file" accept="image/*" multiple />
+                <span class="upload-icon">+</span>
+                <strong>Adicionar fotos do cliente</strong>
+                <small>A primeira foto sera a principal do perfil.</small>
+              </label>
+              <div class="photo-preview client-photo-preview full" id="client-photo-preview" aria-live="polite"></div>
+              <div class="crop-controls full" id="client-crop-controls" hidden>
+                <button class="collapse-toggle" type="button" data-collapse-target="client-crop-fields">Ajustar corte da foto</button>
+                <div class="crop-fields" id="client-crop-fields" hidden>
+                  <label>
+                    Zoom da foto
+                    <input name="cropZoom" type="range" min="1" max="1.8" step="0.05" value="1" />
+                  </label>
+                  <label>
+                    Posicao horizontal
+                    <input name="cropX" type="range" min="0" max="100" step="1" value="50" />
+                  </label>
+                  <label>
+                    Posicao vertical
+                    <input name="cropY" type="range" min="0" max="100" step="1" value="50" />
+                  </label>
+                </div>
+              </div>
+              <button class="submit-button" type="submit">Cadastrar cliente</button>
+            </form>
+
+            <form class="form-grid active" id="owner-form" data-form="owner">
+              <label>
+                Nome do proprietario
+                <input name="name" type="text" placeholder="Nome do proprietario" required />
+              </label>
+              <label>
+                CPF do proprietario
+                <input name="cpf" type="text" placeholder="000.000.000-00" required />
+              </label>
+              <label>
+                Nome do contato 1
+                <input name="contact1Name" type="text" placeholder="Proprietario" required />
+              </label>
+              <label>
+                Contato 1
+                <input name="contact1" type="text" placeholder="(11) 99999-9999" required />
+              </label>
+              <label>
+                Nome do contato 2
+                <input name="contact2Name" type="text" placeholder="Esposa, contador, imobiliaria" />
+              </label>
+              <label>
+                Contato 2
+                <input name="contact2" type="text" placeholder="Telefone, WhatsApp ou email" />
+              </label>
+              <label class="full">
+                Endereco
+                <input name="address" type="text" placeholder="Rua, numero, bairro e cidade" />
+              </label>
+              <label class="upload-tile full">
+                <input name="documents" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" multiple />
+                <span class="upload-icon">+</span>
+                <strong>Adicionar documentos do proprietario</strong>
+                <small>CPF, escritura, procuracao ou documentos do proprietario.</small>
+              </label>
+              <div class="file-preview full" id="owner-document-preview" aria-live="polite"></div>
+              <label class="upload-tile full">
+                <input name="photo" type="file" accept="image/*" />
+                <span class="upload-icon">+</span>
+                <strong>Adicionar foto do proprietario</strong>
+                <small>Uma foto quadrada, com ajuste de corte apos o upload.</small>
+              </label>
+              <div class="photo-preview client-photo-preview full" id="owner-photo-preview" aria-live="polite"></div>
+              <div class="crop-controls full" id="owner-crop-controls" hidden>
+                <button class="collapse-toggle" type="button" data-collapse-target="owner-crop-fields">Ajustar corte da foto</button>
+                <div class="crop-fields" id="owner-crop-fields" hidden>
+                  <label>
+                    Zoom da foto
+                    <input name="cropZoom" type="range" min="1" max="1.8" step="0.05" value="1" />
+                  </label>
+                  <label>
+                    Posicao horizontal
+                    <input name="cropX" type="range" min="0" max="100" step="1" value="50" />
+                  </label>
+                  <label>
+                    Posicao vertical
+                    <input name="cropY" type="range" min="0" max="100" step="1" value="50" />
+                  </label>
+                </div>
+              </div>
+              <label class="full">
+                Observacoes
+                <textarea name="notes" rows="3" placeholder="Preferencias do proprietario, comissao e condicoes"></textarea>
+              </label>
+              <button class="submit-button" type="submit">Cadastrar proprietario</button>
+            </form>
+          </section>
+        </div>
+      </section>
+
+      <section class="view" id="imoveis" data-view="imoveis" aria-label="Imoveis">
+        <div class="list-header">
+          <div>
+            <p class="eyebrow">Carteira</p>
+            <h2>Imoveis cadastrados</h2>
+          </div>
+          <input class="search-input" type="search" placeholder="Filtrar imoveis" data-filter="properties" />
+        </div>
+        <div class="cards-grid" id="property-list"></div>
+      </section>
+
+      <section class="view" id="clientes" data-view="clientes" aria-label="Clientes">
+        <div class="list-header">
+          <div>
+            <p class="eyebrow">Relacionamento</p>
+            <h2>Clientes cadastrados</h2>
+          </div>
+          <input class="search-input" type="search" placeholder="Filtrar clientes" data-filter="clients" />
+        </div>
+        <div class="cards-grid clients" id="client-list"></div>
+      </section>
+
+      <section class="view" id="proprietarios" data-view="proprietarios" aria-label="Proprietarios">
+        <div class="list-header">
+          <div>
+            <p class="eyebrow">Carteira</p>
+            <h2>Proprietarios cadastrados</h2>
+          </div>
+          <input class="search-input" type="search" placeholder="Filtrar proprietarios" data-filter="owners" />
+        </div>
+        <div class="cards-grid clients" id="owner-list"></div>
+      </section>
+
+      <section class="view" id="contratos" data-view="contratos" aria-label="Contratos">
+        <div class="list-header">
+          <div>
+            <p class="eyebrow">Financeiro</p>
+            <h2>Contratos de venda e locacao</h2>
+          </div>
+        </div>
+        <section class="panel">
+          <form class="form-grid active contract-form" id="contract-form">
+            <div class="segmented-control contract-tabs full" role="tablist" aria-label="Tipo de contrato">
+              <button class="segment active" type="button" data-contract-tab="Locacao">Locacao</button>
+              <button class="segment" type="button" data-contract-tab="Compra">Venda</button>
+            </div>
+            <input name="type" type="hidden" value="Locacao" />
+            <label>
+              Imovel
+              <select name="propertyId" required></select>
+            </label>
+            <label>
+              Cliente
+              <select name="clientId" required></select>
+            </label>
+            <section class="contract-type-panel full" data-contract-field="locacao">
+              <div class="section-title">
+                <p class="eyebrow">Locacao</p>
+                <h3>Formulario de contrato de locacao</h3>
+              </div>
+              <label>
+                Tempo do contrato
+                <select name="termMonths">
+                  <option value="6">6 meses</option>
+                  <option value="12">12 meses</option>
+                  <option value="24">24 meses</option>
+                  <option value="30">30 meses</option>
+                  <option value="36">36 meses</option>
+                </select>
+              </label>
+              <label>
+                Valor mensal
+                <input name="monthlyValue" type="number" min="0" step="10" placeholder="2500" />
+              </label>
+              <label>
+                Valor em caucao
+                <input name="securityDeposit" type="number" min="0" step="10" placeholder="0" />
+              </label>
+              <label>
+                Adicionar fiador?
+                <select name="hasGuarantor" data-guarantor-toggle>
+                  <option value="Nao">Nao</option>
+                  <option value="Sim">Sim</option>
+                </select>
+              </label>
+              <section class="guarantor-fields full" data-guarantor-fields hidden>
+                <div class="section-title">
+                  <p class="eyebrow">Fiador</p>
+                  <h3>Cadastro do fiador</h3>
+                </div>
+                <label>Nome completo<input name="guarantorName" placeholder="Nome do fiador" /></label>
+                <label>CPF<input name="guarantorCpf" placeholder="000.000.000-00" /></label>
+                <label>Contato 1<input name="guarantorContact1" placeholder="(00) 00000-0000" /></label>
+                <label>Nome do dono do contato 1<input name="guarantorContact1Name" placeholder="Fiador" /></label>
+                <label>Contato 2<input name="guarantorContact2" placeholder="Email ou telefone" /></label>
+                <label>Nome do dono do contato 2<input name="guarantorContact2Name" placeholder="Email" /></label>
+                <label>Renda mensal<input name="guarantorIncome" type="number" min="0" step="10" placeholder="5000" /></label>
+                <label class="full">Endereco<input name="guarantorAddress" placeholder="Endereco completo" /></label>
+                <label class="full">Observacoes do fiador<textarea name="guarantorNotes" rows="3" placeholder="Documentos, comprovantes e observacoes"></textarea></label>
+                <label class="upload-card full">
+                  <input type="file" multiple data-guarantor-document-upload />
+                  <span>+</span>
+                  <strong>Adicionar documentos do fiador</strong>
+                  <small>RG, CPF, comprovante de renda, endereco ou outros anexos.</small>
+                </label>
+                <div class="file-preview full" id="guarantor-document-preview"></div>
+              </section>
+            </section>
+            <section class="contract-type-panel full" data-contract-field="compra" hidden>
+              <div class="section-title">
+                <p class="eyebrow">Venda</p>
+                <h3>Formulario de contrato de compra e venda</h3>
+              </div>
+              <label>
+                Valor da entrada
+                <input name="downPayment" type="number" min="0" step="1000" placeholder="50000" />
+              </label>
+              <label>
+                Valor total
+                <input name="negotiatedValue" type="number" min="0" step="1000" placeholder="420000" />
+              </label>
+            </section>
+            <label class="full">
+              Observacao
+              <textarea name="notes" rows="3" placeholder="Clausulas principais, combinados e condicoes"></textarea>
+            </label>
+            <button class="submit-button" type="submit">Emitir contrato</button>
+          </form>
+        </section>
+        <section class="panel contract-board">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Contratos lancados</p>
+              <h2>Carteira de contratos</h2>
+            </div>
+          </div>
+          <div class="segmented-control contract-filter-tabs" role="tablist" aria-label="Filtro por tipo">
+            <button class="segment active" type="button" data-contract-type-filter="all">Todos</button>
+            <button class="segment" type="button" data-contract-type-filter="Compra">Venda</button>
+            <button class="segment" type="button" data-contract-type-filter="Locacao">Locacao</button>
+          </div>
+          <div class="segmented-control contract-filter-tabs status-tabs" role="tablist" aria-label="Filtro por status">
+            <button class="segment active" type="button" data-contract-status-filter="all">Ativos</button>
+            <button class="segment" type="button" data-contract-status-filter="Inativo">Inativos</button>
+            <button class="segment" type="button" data-contract-status-filter="Vence em 7 dias">Quase vencendo</button>
+          </div>
+          <label class="period-filter">Periodo<input type="month" data-contract-period-filter /></label>
+          <div class="relation-list page-relations" id="contract-list"></div>
+        </section>
+      </section>
+
+      <section class="view" id="agendamentos" data-view="agendamentos" aria-label="Agendamentos">
+        <div class="list-header">
+          <div>
+            <p class="eyebrow">Agenda operacional</p>
+            <h2>Agendamentos</h2>
+          </div>
+        </div>
+        <div class="operations-layout">
+          <section class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Novo agendamento</p>
+                <h2>Visita ou manutencao</h2>
+              </div>
+            </div>
+            <form class="form-grid active" id="appointment-form">
+              <label>Tipo<select name="type" required>
+                <option value="Visita do cliente">Visita do cliente</option>
+                <option value="Visita da imobiliaria">Visita da imobiliaria</option>
+                <option value="Manutencao">Manutencao</option>
+              </select></label>
+              <label>Imovel<select name="propertyId" required></select></label>
+              <label>Cliente<select name="clientId"></select></label>
+              <label>Responsavel<input name="responsible" type="text" placeholder="Nome do responsavel" /></label>
+              <label>Data<input name="date" type="date" required /></label>
+              <label>Horario<input name="time" type="time" required /></label>
+              <label>Status<select name="status" required>
+                <option value="Agendado">Agendado</option>
+                <option value="Concluido">Concluido</option>
+                <option value="Cancelado">Cancelado</option>
+              </select></label>
+              <label class="full">Observacoes<textarea name="notes" rows="3" placeholder="Chaves, ponto de encontro, reparo ou pedido do cliente"></textarea></label>
+              <button class="submit-button" type="submit">Salvar agendamento</button>
+            </form>
+          </section>
+          <section class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Agenda</p>
+                <h2>Proximos registros</h2>
+              </div>
+            </div>
+            <div class="segmented-control appointment-filter-tabs" role="tablist" aria-label="Filtro por tipo de agendamento">
+              <button class="segment active" type="button" data-appointment-type-filter="all">Todos</button>
+              <button class="segment" type="button" data-appointment-type-filter="Manutencao">Manutencao</button>
+              <button class="segment" type="button" data-appointment-type-filter="Visita do cliente">Visita do cliente</button>
+              <button class="segment" type="button" data-appointment-type-filter="Visita da imobiliaria">Visita da imobiliaria</button>
+            </div>
+            <div class="segmented-control appointment-filter-tabs status-tabs" role="tablist" aria-label="Filtro por status de agendamento">
+              <button class="segment active" type="button" data-appointment-status-filter="all">Ativos</button>
+              <button class="segment" type="button" data-appointment-status-filter="Concluido">Concluido</button>
+              <button class="segment" type="button" data-appointment-status-filter="Quase vencendo">Quase vencendo</button>
+              <button class="segment" type="button" data-appointment-status-filter="Pendente">Pendentes</button>
+            </div>
+            <label class="period-filter">Periodo<input type="month" data-appointment-period-filter /></label>
+            <div class="relation-list page-relations" id="appointment-list"></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="view" id="faturas" data-view="faturas" aria-label="Faturas">
+        <div class="list-header">
+          <div>
+            <p class="eyebrow">Cobranca</p>
+            <h2>Faturas de locacao e compra</h2>
+          </div>
+        </div>
+        <div class="operations-layout">
+          <section class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Emissao</p>
+                <h2>Nova fatura</h2>
+              </div>
+            </div>
+            <div class="segmented-control invoice-tabs full" role="tablist" aria-label="Tipo de fatura">
+              <button class="segment active" type="button" data-invoice-tab="Locacao">Locacao</button>
+              <button class="segment" type="button" data-invoice-tab="Compra">Venda</button>
+              <button class="segment" type="button" data-invoice-tab="Avulsa">Avulso</button>
+            </div>
+            <form class="form-grid active invoice-form" data-invoice-form="Locacao">
+              <input name="category" type="hidden" value="Locacao" />
+              <label>Contrato de locacao<select name="contractId"></select></label>
+              <label>Cliente<select name="clientId" required></select></label>
+              <label>Imovel<select name="propertyId"></select></label>
+              <label>Valor do aluguel<input name="amount" type="number" min="0" step="10" placeholder="2500" required /></label>
+              <label>Mes de referencia<input name="reference" type="month" /></label>
+              <label>Ultimo mes de cobranca<input name="contractEndReference" type="month" readonly /></label>
+              <label>WhatsApp do cliente<input name="whatsappTo" type="tel" placeholder="5513999990000" /></label>
+              <label>Vencimento<input name="dueDate" type="date" required /></label>
+              <label>Status<select name="status" required>
+                <option value="Aberta">Aberta</option>
+                <option value="Paga">Paga</option>
+              </select></label>
+              <label class="full">Descricao<textarea name="description" rows="3" placeholder="Aluguel, condominio, IPTU ou observacao da locacao"></textarea></label>
+              <button class="submit-button" type="submit">Gerar carne de locacao</button>
+            </form>
+            <form class="form-grid invoice-form" data-invoice-form="Compra">
+              <input name="category" type="hidden" value="Compra" />
+              <label>Contrato de venda<select name="contractId" required></select></label>
+              <label>Cliente<select name="clientId" required></select></label>
+              <label>Imovel<select name="propertyId"></select></label>
+              <label>Valor total do imovel<input name="saleTotal" type="number" min="0" step="10" placeholder="350000" readonly required /></label>
+              <label>Valor da entrada<input name="downPayment" type="number" min="0" step="10" placeholder="50000" /></label>
+              <label>Parcela<select name="installmentCount" required>
+                <option value="1">1 parcela</option>
+                <option value="2">2 parcelas</option>
+                <option value="3">3 parcelas</option>
+                <option value="4">4 parcelas</option>
+                <option value="5">5 parcelas</option>
+                <option value="6">6 parcelas</option>
+                <option value="8">8 parcelas</option>
+                <option value="10">10 parcelas</option>
+                <option value="12">12 parcelas</option>
+                <option value="18">18 parcelas</option>
+                <option value="24">24 parcelas</option>
+                <option value="36">36 parcelas</option>
+              </select></label>
+              <label>Juros (%)<input name="interestRate" type="number" min="0" step="0.01" placeholder="0" /></label>
+              <label>Vencimento<input name="dueDate" type="date" required /></label>
+              <label>Status<select name="status" required>
+                <option value="Aberta">Aberta</option>
+                <option value="Paga">Paga</option>
+              </select></label>
+              <label class="full">Descricao<textarea name="description" rows="3" placeholder="Entrada, sinal, parcela negociada ou observacao da venda"></textarea></label>
+              <button class="submit-button" type="submit">Gerar carne de venda</button>
+            </form>
+            <form class="form-grid invoice-form" data-invoice-form="Avulsa">
+              <input name="category" type="hidden" value="Avulsa" />
+              <label>Cliente<select name="clientId" required></select></label>
+              <label>Imovel<select name="propertyId"></select></label>
+              <label>Tipo da cobranca<input name="chargeType" type="text" placeholder="Vistoria, taxa, manutencao" /></label>
+              <label>Valor<input name="amount" type="number" min="0" step="10" placeholder="300" required /></label>
+              <label>Vencimento<input name="dueDate" type="date" required /></label>
+              <label>Status<select name="status" required>
+                <option value="Aberta">Aberta</option>
+                <option value="Paga">Paga</option>
+              </select></label>
+              <label class="full">Descricao<textarea name="description" rows="3" placeholder="Detalhe a cobranca avulsa"></textarea></label>
+              <button class="submit-button" type="submit">Emitir fatura avulsa</button>
+            </form>
+          </section>
+          <section class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Recebimentos</p>
+                <h2>Faturas lancadas</h2>
+              </div>
+            </div>
+            <div class="invoice-page-summary" id="invoice-page-summary"></div>
+            <div class="segmented-control invoice-filter-tabs" role="tablist" aria-label="Filtro por tipo de fatura">
+              <button class="segment active" type="button" data-invoice-type-filter="all">Todas</button>
+              <button class="segment" type="button" data-invoice-type-filter="Locacao">Locacao</button>
+              <button class="segment" type="button" data-invoice-type-filter="Compra">Venda</button>
+              <button class="segment" type="button" data-invoice-type-filter="Avulsa">Avulsa</button>
+            </div>
+            <div class="segmented-control invoice-filter-tabs status-tabs" role="tablist" aria-label="Filtro por status de fatura">
+              <button class="segment active" type="button" data-invoice-status-filter="all">Ativas</button>
+              <button class="segment" type="button" data-invoice-status-filter="Quase vencendo">Quase vencendo</button>
+              <button class="segment" type="button" data-invoice-status-filter="Pendente">Pendentes</button>
+              <button class="segment" type="button" data-invoice-status-filter="Inativa">Inativas</button>
+            </div>
+            <label class="period-filter">Periodo<input type="month" data-invoice-period-filter /></label>
+            <div class="relation-list page-relations" id="invoice-list"></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="view" id="configuracao" data-view="configuracao" aria-label="Configuracao">
+        <div class="list-header">
+          <div>
+            <p class="eyebrow">Sistema</p>
+            <h2>Configuracao</h2>
+          </div>
+        </div>
+        <section class="settings-grid" aria-label="Ferramentas de configuracao">
+          <button class="settings-tool" type="button" data-settings-tool="company">
+            <span>PE</span>
+            <strong>Perfil da empresa</strong>
+            <small>Logo, dados, CRECI e contatos</small>
+          </button>
+          <button class="settings-tool" type="button" data-settings-tool="trash">
+            <span>LX</span>
+            <strong>Lixeira</strong>
+            <small>Itens removidos e recuperacao</small>
+          </button>
+          <button class="settings-tool" type="button" data-settings-tool="users">
+            <span>US</span>
+            <strong>Usuarios</strong>
+            <small>Equipe e permissoes</small>
+          </button>
+          <button class="settings-tool" type="button" data-settings-tool="password">
+            <span>SN</span>
+            <strong>Minha senha</strong>
+            <small>Alterar senha do usuario logado</small>
+          </button>
+          <button class="settings-tool" type="button" data-settings-tool="whatsapp">
+            <span>WA</span>
+            <strong>WhatsApp</strong>
+            <small>Mensagens e integracao</small>
+          </button>
+          <button class="settings-tool" type="button" data-settings-tool="notifications">
+            <span>NT</span>
+            <strong>Notificacoes</strong>
+            <small>Lembretes e alertas</small>
+          </button>
+          <button class="settings-tool" type="button" data-settings-tool="security">
+            <span>SG</span>
+            <strong>Seguranca</strong>
+            <small>Acesso e privacidade</small>
+          </button>
+          <button class="settings-tool" type="button" data-settings-tool="backup">
+            <span>BK</span>
+            <strong>Backup</strong>
+            <small>Exportar e restaurar dados</small>
+          </button>
+          <button class="settings-tool" type="button" data-settings-tool="appearance">
+            <span>AP</span>
+            <strong>Aparencia</strong>
+            <small>Cores e identidade visual</small>
+          </button>
+          <button class="settings-tool" type="button" data-settings-tool="reports">
+            <span>RL</span>
+            <strong>Relatorios</strong>
+            <small>Indicadores e desempenho</small>
+          </button>
+          <button class="settings-tool" type="button" data-settings-tool="cities">
+            <span>CD</span>
+            <strong>Cidades</strong>
+            <small>Bairros e regioes atendidas</small>
+          </button>
+          <button class="settings-tool" type="button" data-settings-tool="integrations">
+            <span>IN</span>
+            <strong>Integracoes</strong>
+            <small>Portais, API e automacoes</small>
+          </button>
+          <button class="settings-tool" type="button" data-settings-tool="templates">
+            <span>MD</span>
+            <strong>Modelos</strong>
+            <small>Contratos e mensagens</small>
+          </button>
+          <button class="settings-tool" type="button" data-settings-tool="help">
+            <span>?</span>
+            <strong>Ajuda</strong>
+            <small>Suporte e manual do sistema</small>
+          </button>
+        </section>
+      </section>
+    </main>
+
+    <div class="toast" role="status" aria-live="polite" id="toast"></div>
+    <div class="modal-backdrop" id="login-modal" hidden>
+      <section class="login-modal" role="dialog" aria-modal="true" aria-labelledby="login-title">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Acesso interno</p>
+            <h2 id="login-title">Area do corretor</h2>
+          </div>
+          <button class="icon-button" type="button" data-close-login aria-label="Fechar">x</button>
+        </div>
+        <form class="login-form" id="login-form">
+          <label>Email<input name="email" type="email" placeholder="admin@regisimobiliaria.com" required /></label>
+          <label>Senha<input name="password" type="password" placeholder="Senha de acesso" required /></label>
+          <button class="submit-button" type="submit">Entrar no sistema</button>
+          <p>Login inicial: admin@regisimobiliaria.com / regis6210</p>
+        </form>
+        <form class="login-form reset-form" id="password-reset-request-form">
+          <label>Recuperar senha<input name="email" type="email" placeholder="Digite seu email de usuario" required /></label>
+          <button class="secondary-button" type="submit">Solicitar nova senha</button>
+          <p>O administrador libera a redefinicao em Configuracoes > Usuarios.</p>
+        </form>
+      </section>
+    </div>
+    <div class="modal-backdrop" id="profile-modal" hidden>
+      <section class="profile-modal" role="dialog" aria-modal="true" aria-labelledby="profile-title">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow" id="profile-kind">Perfil</p>
+            <h2 id="profile-title">Detalhes</h2>
+          </div>
+          <button class="icon-button" type="button" data-close-modal aria-label="Fechar">x</button>
+        </div>
+        <div class="modal-body" id="profile-content"></div>
+      </section>
+    </div>
+    <script src="assets/jspdf.browser.js?v=20260604a"></script>
+    <script src="script.js?v=20260608f"></script>
+  </body>
+</html>

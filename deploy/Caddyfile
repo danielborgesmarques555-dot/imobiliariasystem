@@ -1,0 +1,5 @@
+seudominio.com.br, www.seudominio.com.br {
+    root * /var/www/regis-imobiliaria
+    file_server
+    try_files {path} /index.html
+}

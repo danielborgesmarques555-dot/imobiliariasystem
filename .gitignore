@@ -1,0 +1,28 @@
+# Sistema / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs e temporarios
+*.log
+tmp/
+temp/
+
+# Dependencias futuras
+node_modules/
+vendor/
+
+# Variaveis e segredos
+.env
+.env.*
+!.env.example
+
+# Builds futuros
+dist/
+build/
+.cache/
+
+# Backups locais exportados pelo sistema
+backups/
+*.backup.json
