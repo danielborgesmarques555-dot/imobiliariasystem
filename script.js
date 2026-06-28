@@ -72,6 +72,10 @@ const contractPlaceholders = [
   ["valor_caucao", "Valor em caucao"],
   ["valor_entrada", "Valor da entrada"],
   ["valor_total_venda", "Valor total da venda"],
+  ["valor_avulso", "Valor avulso"],
+  ["data_entrada", "Data de entrada"],
+  ["data_saida", "Data de saida"],
+  ["categoria_temporada", "Categoria da temporada"],
   ["imovel_titulo", "Imovel"],
   ["imovel_tipo", "Tipo do imovel"],
   ["imovel_endereco", "Endereco do imovel"],
@@ -170,6 +174,31 @@ CLAUSULA 04 - OBSERVACOES
 
 As partes assinam o presente instrumento em comum acordo.`,
     },
+    avulso: {
+      title: "CONTRATO AVULSO DE TEMPORADA",
+      body: `{{empresa_nome}}, {{empresa_razao_social}}, inscrita no CNPJ sob nÂº {{empresa_cnpj}}, CRECI {{empresa_creci}}, com endereco em {{empresa_endereco}}, apresenta a presente minuta contratual.
+
+RESPONSAVEL PELO IMOVEL: {{proprietario_nome}}, CPF/CNPJ {{proprietario_cpf}}, contato {{proprietario_contato}}.
+
+CLIENTE: {{cliente_nome}}, CPF/CNPJ {{cliente_cpf}}, contato {{cliente_contato}}, endereco {{cliente_endereco}}.
+
+CLAUSULA 01 - OBJETO
+O presente contrato tem por objeto a utilizacao avulsa por temporada do imovel {{imovel_titulo}}, do tipo {{imovel_tipo}}, situado em {{imovel_endereco}}.
+
+CLAUSULA 02 - PERIODO
+O periodo contratado inicia em {{data_entrada}} e termina em {{data_saida}}, na categoria {{categoria_temporada}}.
+
+CLAUSULA 03 - VALOR
+O valor ajustado para o periodo e de {{valor_avulso}}, observadas as condicoes pactuadas entre as partes.
+
+CLAUSULA 04 - OBRIGACOES
+O cliente declara receber o imovel para uso temporario, comprometendo-se a zelar pela conservacao, respeitar as regras combinadas e devolver o imovel ao final do periodo contratado.
+
+CLAUSULA 05 - OBSERVACOES
+{{observacoes}}
+
+As partes assinam o presente instrumento em comum acordo.`,
+    },
   };
 }
 
@@ -240,6 +269,8 @@ const defaultProperties = [
     subtype: "Casa",
     purpose: "Venda",
     price: 420000,
+    grossValue: 390000,
+    netValue: 420000,
     iptu: 1200,
     district: "Centro",
     city: "Registro",
@@ -259,6 +290,8 @@ const defaultProperties = [
     subtype: "Apartamento",
     purpose: "Locacao",
     price: 2200,
+    grossValue: 1900,
+    netValue: 2200,
     iptu: 780,
     district: "Jardim Paulista",
     city: "Registro",
@@ -325,6 +358,7 @@ function ensureCompany(company = {}) {
     logo: "",
     theme: "regis",
     colors: { ...themePresets.regis },
+    publicHighlights: "",
     contractTemplates: defaultContractTemplates(),
     whatsapp: {
       sender: "",
@@ -373,6 +407,7 @@ function ensureCompany(company = {}) {
     contractTemplates: {
       locacao: { ...defaults.contractTemplates.locacao, ...(company.contractTemplates?.locacao || {}) },
       compra: { ...defaults.contractTemplates.compra, ...(company.contractTemplates?.compra || {}) },
+      avulso: { ...defaults.contractTemplates.avulso, ...(company.contractTemplates?.avulso || {}) },
     },
   };
 }
@@ -408,9 +443,13 @@ const state = {
   selectedGuarantorDocs: [],
   selectedClientCrop: { zoom: 1, x: 50, y: 50 },
   selectedOwnerCrop: { zoom: 1, x: 50, y: 50 },
+  pendingContractSignatures: {},
+  activeSignaturePad: null,
   activeProfile: null,
   activeProfileTab: "summary",
   carouselIndex: 0,
+  publicHeroIndex: 0,
+  publicHeroTimer: null,
   authenticated: localStorage.getItem(authKey) === "true",
   currentUserId: localStorage.getItem(currentUserKey) || "",
   filters: {
@@ -420,8 +459,18 @@ const state = {
     publicType: "all",
     publicMaxPrice: "",
     properties: "",
+    propertyPurpose: "all",
+    propertyAvailability: "all",
+    propertyType: "all",
+    propertyCity: "all",
     clients: "",
+    clientContract: "all",
+    clientDocument: "all",
+    clientCity: "all",
     owners: "",
+    ownerProperty: "all",
+    ownerDocument: "all",
+    ownerCity: "all",
     contractType: "all",
     contractStatus: "all",
     contractPeriod: "",
@@ -464,6 +513,7 @@ function ensureProperties(items) {
     id: item.id || createId("property"),
     ownerId: item.ownerId || "",
     available: item.available !== false,
+    featured: Boolean(item.featured),
     ...inferPropertyType(item),
     googleLocation: item.googleLocation || [item.district, item.city].filter(Boolean).join(", "),
     googleMapsUrl: item.googleMapsUrl || "",
@@ -474,6 +524,9 @@ function ensureProperties(items) {
     city: item.city || "",
     district: item.district || "",
     iptu: item.iptu || "",
+    grossValue: item.grossValue || item.ownerAskPrice || item.price || "",
+    netValue: item.netValue || item.finalPrice || item.price || item.grossValue || "",
+    price: item.netValue || item.finalPrice || item.price || item.grossValue || "",
     leisureArea: item.leisureArea || "Nao",
     pool: item.pool || "Nao",
     garage: item.garage || "Nao",
@@ -529,10 +582,14 @@ function ensureContracts(items) {
     propertyId: item.propertyId || "",
     clientId: item.clientId || "",
     type: item.type || "Locacao",
-    payerRole: item.payerRole || (item.type === "Compra" ? "Comprador" : "Inquilino"),
-    amount: item.amount || item.monthlyValue || item.negotiatedValue || "",
+    payerRole: item.payerRole || (item.type === "Compra" ? "Comprador" : item.type === "Avulso" ? "Cliente" : "Inquilino"),
+    amount: item.amount || item.monthlyValue || item.negotiatedValue || item.oneOffValue || "",
     monthlyValue: item.monthlyValue || (item.type === "Locacao" ? item.amount : ""),
     negotiatedValue: item.negotiatedValue || (item.type === "Compra" ? item.amount : ""),
+    oneOffValue: item.oneOffValue || (item.type === "Avulso" ? item.amount : ""),
+    seasonStart: item.seasonStart || "",
+    seasonEnd: item.seasonEnd || "",
+    seasonCategory: item.seasonCategory || (item.type === "Avulso" ? "Temporada" : ""),
     downPayment: item.downPayment || "",
     securityDeposit: item.securityDeposit || "",
     hasGuarantor: item.hasGuarantor || (item.guarantor?.name ? "Sim" : "Nao"),
@@ -953,6 +1010,23 @@ function findContract(id) {
   return state.contracts.find((contract) => contract.id === id);
 }
 
+function propertyGrossValue(property) {
+  return Number(property?.grossValue || property?.ownerAskPrice || property?.price || 0);
+}
+
+function propertyNetValue(property) {
+  return Number(property?.netValue || property?.finalPrice || property?.price || property?.grossValue || 0);
+}
+
+function propertyProfitValue(property) {
+  return Math.max(0, propertyNetValue(property) - propertyGrossValue(property));
+}
+
+function propertyProfitPercent(property) {
+  const gross = propertyGrossValue(property);
+  return gross > 0 ? (propertyProfitValue(property) / gross) * 100 : 0;
+}
+
 function findTeamMember(id) {
   return state.team.find((member) => member.id === id);
 }
@@ -992,7 +1066,7 @@ function viewPermission(viewName) {
     agendamentos: "Agendamentos",
     faturas: "Faturas",
     equipe: "Configuracoes",
-    configuracao: "",
+    configuracao: "Configuracoes",
   };
   return map[viewName] || "";
 }
@@ -1000,6 +1074,10 @@ function viewPermission(viewName) {
 function canOpenView(viewName) {
   const permission = viewPermission(viewName);
   return permission ? hasPermission(permission) : state.authenticated;
+}
+
+function firstAvailableView() {
+  return Array.from(document.querySelectorAll("[data-view-link]")).find((link) => !link.hidden)?.dataset.viewLink || "site-publico";
 }
 
 function canWrite(permission) {
@@ -1011,7 +1089,6 @@ function canManageUsers() {
 }
 
 function canUseSettingsTool(tool) {
-  if (tool === "password") return state.authenticated;
   if (!hasPermission("Configuracoes")) return false;
   if (isAdmin()) return true;
   return !["users", "trash", "backup", "appearance", "security"].includes(tool);
@@ -1220,7 +1297,7 @@ function emptyTrash() {
 
 function updateMetrics() {
   const total = state.properties.length;
-  const sum = state.properties.reduce((acc, property) => acc + Number(property.price || 0), 0);
+  const sum = state.properties.reduce((acc, property) => acc + propertyNetValue(property), 0);
   const average = total ? sum / total : 0;
 
   if (document.querySelector("#metric-properties")) document.querySelector("#metric-properties").textContent = total;
@@ -1237,6 +1314,11 @@ function renderDashboardReports() {
   const saleProperties = state.properties.filter((property) => property.purpose === "Venda");
   const rentProperties = state.properties.filter((property) => property.purpose === "Locacao");
   const propertiesWithOwner = state.properties.filter((property) => property.ownerId && findOwner(property.ownerId));
+  const grossPortfolio = state.properties.reduce((sum, property) => sum + propertyGrossValue(property), 0);
+  const netPortfolio = state.properties.reduce((sum, property) => sum + propertyNetValue(property), 0);
+  const profitPortfolio = state.properties.reduce((sum, property) => sum + propertyProfitValue(property), 0);
+  const monthlyRentProfit = rentProperties.reduce((sum, property) => sum + propertyProfitValue(property), 0);
+  const profitPercent = grossPortfolio > 0 ? (profitPortfolio / grossPortfolio) * 100 : 0;
 
   const clientsWithCpf = state.clients.filter((client) => client.cpf);
   const clientsWithAddress = state.clients.filter((client) => client.address);
@@ -1252,6 +1334,7 @@ function renderDashboardReports() {
   const rescindedContracts = state.contracts.filter((contract) => contract.rescinded);
   const rentContracts = state.contracts.filter((contract) => contract.type === "Locacao");
   const saleContracts = state.contracts.filter((contract) => contract.type === "Compra");
+  const oneOffContracts = state.contracts.filter((contract) => contract.type === "Avulso");
 
   const reportCards = [
     {
@@ -1263,6 +1346,10 @@ function renderDashboardReports() {
         ["Venda", saleProperties.length],
         ["Locacao", rentProperties.length],
         ["Com proprietario", propertiesWithOwner.length],
+        ["Valor bruto", formatter.format(grossPortfolio)],
+        ["Valor liquido", formatter.format(netPortfolio)],
+        ["Lucro previsto", `${formatter.format(profitPortfolio)} (${profitPercent.toFixed(1)}%)`],
+        ["Lucro mensal locacao", formatter.format(monthlyRentProfit)],
       ],
     },
     {
@@ -1295,6 +1382,7 @@ function renderDashboardReports() {
         ["Rescindidos", rescindedContracts.length],
         ["Locacao", rentContracts.length],
         ["Venda", saleContracts.length],
+        ["Avulso", oneOffContracts.length],
       ],
     },
   ];
@@ -1317,12 +1405,64 @@ function renderDashboardReports() {
     .join("");
 }
 
+function locationFilterValue(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  const parts = text.split(",").map((part) => part.trim()).filter(Boolean);
+  return parts.length > 1 ? parts[parts.length - 2] : parts[0];
+}
+
+function updateFilterSelect(selector, options, currentValue) {
+  const select = document.querySelector(selector);
+  if (!select) return;
+  const firstOption = select.querySelector("option")?.outerHTML || '<option value="all">Todos</option>';
+  const uniqueOptions = [...new Set(options.filter(Boolean))].sort((a, b) => a.localeCompare(b, "pt-BR"));
+  select.innerHTML = `${firstOption}${uniqueOptions.map((option) => `<option value="${escapeHtml(option)}">${escapeHtml(option)}</option>`).join("")}`;
+  select.value = uniqueOptions.includes(currentValue) ? currentValue : "all";
+  state.filters[select.dataset.filter] = select.value;
+}
+
+function renderListFilterOptions() {
+  updateFilterSelect(
+    '[data-filter="propertyType"]',
+    state.properties.map((property) => property.type),
+    state.filters.propertyType,
+  );
+  updateFilterSelect(
+    '[data-filter="propertyCity"]',
+    state.properties.map((property) => property.city || locationFilterValue(propertyLocation(property))),
+    state.filters.propertyCity,
+  );
+  updateFilterSelect(
+    '[data-filter="clientCity"]',
+    state.clients.map((client) => locationFilterValue(client.address)),
+    state.filters.clientCity,
+  );
+  updateFilterSelect(
+    '[data-filter="ownerCity"]',
+    state.owners.map((owner) => locationFilterValue(owner.address)),
+    state.filters.ownerCity,
+  );
+}
+
 function renderProperties() {
   const list = document.querySelector("#property-list");
   const query = normalize(state.filters.properties);
-  const items = state.properties.filter((property) =>
-    normalize(`${property.title} ${property.type} ${property.subtype} ${property.purpose} ${propertyLocation(property)} ${propertyOwner(property).name}`).includes(query),
-  );
+  const purpose = state.filters.propertyPurpose;
+  const availability = state.filters.propertyAvailability;
+  const type = state.filters.propertyType;
+  const city = state.filters.propertyCity;
+  const items = state.properties.filter((property) => {
+    const searchMatch = normalize(`${property.title} ${property.type} ${property.subtype} ${property.purpose} ${propertyLocation(property)} ${propertyOwner(property).name}`).includes(query);
+    const purposeMatch = purpose === "all" || property.purpose === purpose;
+    const availabilityMatch =
+      availability === "all" ||
+      (availability === "available" && property.available) ||
+      (availability === "unavailable" && !property.available);
+    const typeMatch = type === "all" || property.type === type;
+    const cityMatch = city === "all" || normalize(property.city || propertyLocation(property)).includes(normalize(city));
+    return searchMatch && purposeMatch && availabilityMatch && typeMatch && cityMatch;
+  });
 
   list.innerHTML = "";
 
@@ -1366,7 +1506,7 @@ function renderProperties() {
           <span class="pill">${area} m2</span>
         </div>
         <h3>${title}</h3>
-        <div class="price">${formatter.format(Number(property.price || 0))}</div>
+        <div class="price">${formatter.format(propertyNetValue(property))}</div>
         <p class="card-text">${location}${hasPositiveNumber(property.rooms) ? ` &middot; ${rooms} quartos` : ""}</p>
         <p class="card-text">${notes}</p>
       </div>
@@ -1388,6 +1528,7 @@ function renderContractOptions() {
   clientSelect.innerHTML = state.clients
     .map((client) => `<option value="${client.id}">${escapeHtml(client.name)} - ${escapeHtml(client.cpf)}</option>`)
     .join("");
+  syncContractValueFromProperty(false);
 }
 
 function renderContractList() {
@@ -1438,7 +1579,9 @@ function contractComputedStatus(contract) {
 }
 
 function contractAmount(contract) {
-  return Number(contract.type === "Compra" ? contract.negotiatedValue || contract.downPayment || contract.amount : contract.monthlyValue || contract.amount || 0);
+  if (contract.type === "Compra") return Number(contract.negotiatedValue || contract.downPayment || contract.amount || 0);
+  if (contract.type === "Avulso") return Number(contract.oneOffValue || contract.amount || 0);
+  return Number(contract.monthlyValue || contract.amount || 0);
 }
 
 function contractDaysToDue(contract) {
@@ -1451,6 +1594,7 @@ function contractDaysToDue(contract) {
 }
 
 function contractDueDate(contract) {
+  if (contract.type === "Avulso") return contract.seasonEnd || contract.dueDate || "";
   if (contract.type !== "Locacao") return "";
   if (contract.dueDate) return contract.dueDate;
   const issued = new Date(contract.issuedAt || contract.createdAt || new Date().toISOString());
@@ -1464,8 +1608,8 @@ function contractSignatureParties(contract) {
   const owner = property ? propertyOwner(property) : null;
   const client = findClient(contract.clientId);
   const parties = [
-    { role: contract.type === "Locacao" ? "Locador(a)" : "Vendedor(a)", name: owner?.name || "Proprietario", key: "owner" },
-    { role: contract.type === "Locacao" ? "Locatario(a)" : "Comprador(a)", name: client?.name || "Cliente", key: "client" },
+    { role: contract.type === "Locacao" ? "Locador(a)" : contract.type === "Avulso" ? "Responsavel pelo imovel" : "Vendedor(a)", name: owner?.name || "Proprietario", key: "owner" },
+    { role: contract.type === "Locacao" ? "Locatario(a)" : contract.type === "Avulso" ? "Cliente" : "Comprador(a)", name: client?.name || "Cliente", key: "client" },
   ];
   if (contract.type === "Locacao" && contract.hasGuarantor === "Sim" && contract.guarantor?.name) {
     parties.push({ role: "Fiador(a)", name: contract.guarantor.name, key: "guarantor" });
@@ -1586,9 +1730,18 @@ function renderContractReminders() {
 function renderClients() {
   const list = document.querySelector("#client-list");
   const query = normalize(state.filters.clients);
-  const items = state.clients.filter((client) =>
-    normalize(`${client.name} ${client.cpf} ${client.contact1} ${client.contact2} ${client.address}`).includes(query),
-  );
+  const contractFilter = state.filters.clientContract;
+  const documentFilter = state.filters.clientDocument;
+  const city = state.filters.clientCity;
+  const items = state.clients.filter((client) => {
+    const contracts = clientContracts(client.id).length;
+    const documents = Array.isArray(client.documents) ? client.documents.length : 0;
+    const searchMatch = normalize(`${client.name} ${client.cpf} ${client.contact1} ${client.contact2} ${client.address}`).includes(query);
+    const contractMatch = contractFilter === "all" || (contractFilter === "with" && contracts > 0) || (contractFilter === "without" && contracts === 0);
+    const documentMatch = documentFilter === "all" || (documentFilter === "with" && documents > 0) || (documentFilter === "without" && documents === 0);
+    const cityMatch = city === "all" || normalize(client.address).includes(normalize(city));
+    return searchMatch && contractMatch && documentMatch && cityMatch;
+  });
 
   list.innerHTML = "";
 
@@ -1637,9 +1790,18 @@ function renderOwners() {
   if (!list) return;
 
   const query = normalize(state.filters.owners);
-  const items = state.owners.filter((owner) =>
-    normalize(`${owner.name} ${owner.cpf} ${owner.contact1} ${owner.contact2} ${owner.address}`).includes(query),
-  );
+  const propertyFilter = state.filters.ownerProperty;
+  const documentFilter = state.filters.ownerDocument;
+  const city = state.filters.ownerCity;
+  const items = state.owners.filter((owner) => {
+    const properties = ownerProperties(owner.id).length;
+    const documents = Array.isArray(owner.documents) ? owner.documents.length : 0;
+    const searchMatch = normalize(`${owner.name} ${owner.cpf} ${owner.contact1} ${owner.contact2} ${owner.address}`).includes(query);
+    const propertyMatch = propertyFilter === "all" || (propertyFilter === "with" && properties > 0) || (propertyFilter === "without" && properties === 0);
+    const documentMatch = documentFilter === "all" || (documentFilter === "with" && documents > 0) || (documentFilter === "without" && documents === 0);
+    const cityMatch = city === "all" || normalize(owner.address).includes(normalize(city));
+    return searchMatch && propertyMatch && documentMatch && cityMatch;
+  });
 
   list.innerHTML = "";
 
@@ -1732,13 +1894,7 @@ function renderTeam() {
 
   state.team.forEach((member) => {
     const permissions = member.permissions?.length ? member.permissions.join(", ") : "Sem permissoes liberadas";
-    const passwordStatus = member.passwordResetAuthorized
-      ? "Redefinicao liberada"
-      : member.resetRequested
-        ? "Redefinicao solicitada"
-        : member.passwordSet
-          ? "Senha definida"
-          : "Primeiro acesso pendente";
+    const passwordStatus = member.passwordSet ? "Senha definida" : "Primeiro acesso pendente";
     const article = document.createElement("article");
     article.className = "team-card";
     article.innerHTML = `
@@ -1758,9 +1914,8 @@ function renderTeam() {
       <p><strong>Senha:</strong> ${escapeHtml(passwordStatus)}</p>
       ${member.notes ? `<p>${escapeHtml(member.notes)}</p>` : ""}
       <div class="team-actions">
-        <button class="secondary-button" type="button" data-edit-team="${member.id}">Editar acesso</button>
-        <button class="secondary-button" type="button" data-authorize-password-reset="${member.id}" ${!canManageUsers() || member.passwordResetAuthorized ? "disabled" : ""}>Liberar nova senha</button>
-        <button class="danger-button" type="button" data-delete-team="${member.id}">Remover acesso</button>
+        ${canManageUsers() ? `<button class="secondary-button" type="button" data-edit-team="${member.id}">Editar acesso</button>` : ""}
+        ${canManageUsers() ? `<button class="danger-button" type="button" data-delete-team="${member.id}">Remover acesso</button>` : ""}
       </div>
     `;
     list.append(article);
@@ -2011,6 +2166,8 @@ function renderInvoices() {
         ${invoice.description ? `<p>${escapeHtml(invoice.description)}</p>` : ""}
       </div>
       <div class="operation-actions">
+        ${invoiceBookletItems(invoice).length > 1 ? `<button class="secondary-button" type="button" data-download-invoice-booklet="${invoice.id}">Baixar carne</button>` : ""}
+        <button class="secondary-button" type="button" data-download-invoice="${invoice.id}">Baixar fatura</button>
         <button class="secondary-button" type="button" data-pay-invoice="${invoice.id}" ${status === "Inativa" ? "disabled" : ""}>${status === "Inativa" ? "Finalizada" : "Registrar pagamento"}</button>
       </div>
     `;
@@ -2043,7 +2200,7 @@ function publicProperties() {
     const purposeMatch = purpose === "all" || property.purpose === purpose;
     const cityMatch = city === "all" || normalize(property.city || propertyLocation(property)).includes(normalize(city));
     const typeMatch = type === "all" || property.type === type;
-    const priceMatch = !maxPrice || Number(property.price || 0) <= maxPrice;
+    const priceMatch = !maxPrice || propertyNetValue(property) <= maxPrice;
     return queryMatch && purposeMatch && cityMatch && typeMatch && priceMatch;
   });
 }
@@ -2054,6 +2211,44 @@ function publicContactHref(property = null) {
     ? `Ola, tenho interesse no imovel ${property.title}.`
     : `Ola, quero atendimento da ${state.company.name || "imobiliaria"}.`;
   return phone ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}` : `mailto:${state.company.email || ""}?subject=${encodeURIComponent("Interesse em imovel")}&body=${encodeURIComponent(text)}`;
+}
+
+function renderPublicContactPage() {
+  const info = document.querySelector("#site-contact-info");
+  if (info) {
+    const rows = [
+      ["Telefone", state.company.phone],
+      ["Email", state.company.email],
+      ["Endereco", state.company.address],
+      ["CRECI", state.company.creci],
+      ["Razao social", state.company.legalName],
+      ["CNPJ", state.company.cnpj],
+    ].filter(([, value]) => value);
+    info.innerHTML = rows.length
+      ? rows.map(([label, value]) => `<p><strong>${escapeHtml(label)}:</strong> ${escapeHtml(value)}</p>`).join("")
+      : '<p>Configure telefone, email e endereco em Configuracoes > Perfil da empresa.</p>';
+  }
+
+  const list = document.querySelector("#site-realtor-list");
+  if (list) {
+    const members = state.team.filter((member) => member.status !== "Inativo" && ["Corretor", "Gestao", "Atendimento"].includes(member.role));
+    list.innerHTML = members.length
+      ? members
+          .map(
+            (member) => `
+              <article class="site-realtor-item">
+                <span class="avatar" aria-hidden="true">${escapeHtml(normalize(member.name).charAt(0).toUpperCase() || "C")}</span>
+                <div>
+                  <strong>${escapeHtml(member.name)}</strong>
+                  <p>${escapeHtml(member.role || "Equipe")}${member.phone ? ` · ${escapeHtml(member.phone)}` : ""}</p>
+                  ${member.email ? `<a href="mailto:${escapeHtml(member.email)}">${escapeHtml(member.email)}</a>` : ""}
+                </div>
+              </article>
+            `,
+          )
+          .join("")
+      : '<p>Cadastre corretores em Configuracoes > Usuarios para exibir a equipe no site.</p>';
+  }
 }
 
 function renderPublicBranding() {
@@ -2073,6 +2268,26 @@ function renderPublicBranding() {
   if (whatsapp) whatsapp.href = publicContactHref();
   const email = document.querySelector("[data-public-email]");
   if (email) email.href = `mailto:${state.company.email || ""}`;
+  renderPublicContactPage();
+}
+
+function setPublicPage(page = "home") {
+  const allowed = ["home", "imoveis", "contato"];
+  const activePage = allowed.includes(page) ? page : "home";
+  document.querySelectorAll("[data-public-page]").forEach((section) => {
+    section.classList.toggle("active", section.dataset.publicPage === activePage);
+  });
+  document.querySelectorAll("[data-public-page-link]").forEach((link) => {
+    link.classList.toggle("active", link.dataset.publicPageLink === activePage);
+  });
+}
+
+function publicPageFromHash() {
+  const hash = window.location.hash.replace("#", "");
+  if (["home", "imoveis", "contato"].includes(hash)) return hash;
+  if (hash === "site-imoveis") return "imoveis";
+  if (hash === "site-contato") return "contato";
+  return "home";
 }
 
 function renderPublicTypeOptions() {
@@ -2106,7 +2321,7 @@ function renderPublicHero(items) {
       <div>
         <span class="pill purpose-pill">${escapeHtml(featured.purpose)}</span>
         <h2>${escapeHtml(featured.title)}</h2>
-        <p>${escapeHtml(propertyLocation(featured) || "Localizacao sob consulta")} · ${formatter.format(Number(featured.price || 0))}</p>
+        <p>${escapeHtml(propertyLocation(featured) || "Localizacao sob consulta")} · ${formatter.format(propertyNetValue(featured))}</p>
       </div>
     </article>
   `;
@@ -2148,7 +2363,7 @@ function renderPublicProperties() {
               <span class="pill available-pill">Disponivel</span>
             </div>
             <h3>${escapeHtml(property.title)}</h3>
-            <div class="price">${formatter.format(Number(property.price || 0))}</div>
+            <div class="price">${formatter.format(propertyNetValue(property))}</div>
             <p>${escapeHtml(location)}</p>
             ${details ? `<p>${escapeHtml(details)}</p>` : ""}
             <div class="site-card-actions">
@@ -2160,6 +2375,168 @@ function renderPublicProperties() {
       `;
     })
     .join("");
+}
+
+function stopPublicHeroCarousel() {
+  if (state.publicHeroTimer) {
+    clearInterval(state.publicHeroTimer);
+    state.publicHeroTimer = null;
+  }
+}
+
+function startPublicHeroCarousel(total) {
+  stopPublicHeroCarousel();
+  if (total < 2) return;
+  state.publicHeroTimer = setInterval(() => {
+    state.publicHeroIndex = (state.publicHeroIndex + 1) % total;
+    renderPublicHeroV2();
+  }, 5200);
+}
+
+function renderPublicHeroV2(items = state.properties) {
+  const media = document.querySelector("#site-hero-media");
+  if (!media) return;
+  const featuredItems = items.filter((property) => property.available !== false && property.featured);
+  if (state.publicHeroIndex >= featuredItems.length) state.publicHeroIndex = 0;
+  const featured = featuredItems[state.publicHeroIndex];
+  if (!featured) {
+    media.innerHTML = '<div class="site-empty-featured">Marque um imovel disponivel com estrela para ele aparecer no carrossel da Home.</div>';
+    stopPublicHeroCarousel();
+    return;
+  }
+  const src = getPhotoSrc(featured.photos?.[0]);
+  const location = propertyLocation(featured) || "Localizacao sob consulta";
+  media.innerHTML = `
+    <div class="site-featured-carousel" aria-label="Imoveis em destaque">
+      <article class="site-featured-card" data-public-property="${featured.id}">
+        ${src ? `<img src="${src}" alt="Foto de ${escapeHtml(featured.title)}">` : ""}
+        <div>
+          <span class="pill purpose-pill">${escapeHtml(featured.purpose)}</span>
+          <h2>${escapeHtml(featured.title)}</h2>
+          <p>${escapeHtml(location)} &middot; ${formatter.format(propertyNetValue(featured))}</p>
+          <button class="site-ghost-button" type="button">Ver detalhes</button>
+        </div>
+      </article>
+      ${
+        featuredItems.length > 1
+          ? `<div class="site-featured-controls">
+              <button type="button" data-public-featured="prev" aria-label="Imovel anterior">&lt;</button>
+              <button type="button" data-public-featured="next" aria-label="Proximo imovel">&gt;</button>
+            </div>
+            <div class="site-featured-dots">
+              ${featuredItems.map((_, index) => `<button type="button" class="${index === state.publicHeroIndex ? "active" : ""}" data-public-featured-dot="${index}" aria-label="Destaque ${index + 1}"></button>`).join("")}
+            </div>`
+          : ""
+      }
+    </div>
+  `;
+  startPublicHeroCarousel(featuredItems.length);
+}
+function renderPublicProperties() {
+  renderPublicBranding();
+  renderPublicTypeOptions();
+  renderPublicCityOptions();
+  const list = document.querySelector("#site-property-list");
+  const count = document.querySelector("#site-property-count");
+  if (!list) return;
+  const items = publicProperties();
+  renderPublicHeroV2();
+  setPublicPage(publicPageFromHash());
+  if (count) count.textContent = `${items.length} ${items.length === 1 ? "imovel" : "imoveis"}`;
+  if (!items.length) {
+    list.innerHTML = '<div class="empty-state">Nenhum imovel disponivel com esses filtros.</div>';
+    return;
+  }
+  list.innerHTML = items
+    .map((property) => {
+      const src = getPhotoSrc(property.photos?.[0]);
+      const location = propertyLocation(property) || "Localizacao sob consulta";
+      const details = [
+        property.subtype || property.type,
+        hasPositiveNumber(property.rooms) ? `${property.rooms} quartos` : "",
+        hasPositiveNumber(property.area) ? `${property.area} m2` : "",
+      ]
+        .filter(Boolean)
+        .join(" · ");
+      return `
+        <article class="site-property-card" data-public-property="${property.id}" tabindex="0" role="button" aria-label="Ver detalhes de ${escapeHtml(property.title)}">
+          <div class="site-card-photo">
+            ${src ? `<img src="${src}" alt="Foto de ${escapeHtml(property.title)}">` : ""}
+            <span>${escapeHtml(property.purpose)}</span>
+          </div>
+          <div class="site-card-body">
+            <div class="card-meta">
+              <span class="pill">${escapeHtml(property.purpose)}</span>
+              <span class="pill available-pill">Disponivel</span>
+            </div>
+            <h3>${escapeHtml(property.title)}</h3>
+            <div class="price">${formatter.format(propertyNetValue(property))}</div>
+            <p>${escapeHtml(location)}</p>
+            ${details ? `<p>${escapeHtml(details)}</p>` : ""}
+            <div class="site-card-actions">
+              <a class="submit-button" href="${escapeHtml(publicContactHref(property))}" target="_blank" rel="noopener">Tenho interesse</a>
+              <button class="secondary-button" type="button" data-public-property="${property.id}">Detalhes</button>
+            </div>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+function renderPublicPropertyDetail(propertyId) {
+  const property = findProperty(propertyId);
+  if (!property || property.available === false) return;
+  const modal = document.querySelector("#public-property-modal");
+  const content = document.querySelector("#public-property-content");
+  const title = document.querySelector("#public-property-title");
+  if (!modal || !content) return;
+  const photos = Array.isArray(property.photos) ? property.photos : [];
+  const mainPhoto = getPhotoSrc(photos[0]);
+  const map = propertyGoogleMapsEmbed(property);
+  const details = [
+    ["Finalidade", property.purpose],
+    ["Tipo", [property.type, property.subtype].filter(Boolean).join(" / ")],
+    ["Valor", formatter.format(propertyNetValue(property))],
+    ["Area", hasPositiveNumber(property.area) ? `${property.area} m2` : ""],
+    ["Quartos", hasPositiveNumber(property.rooms) ? property.rooms : ""],
+    ["Garagem", property.garage],
+    ["IPTU", property.iptu ? formatter.format(Number(property.iptu || 0)) : ""],
+  ].filter(([, value]) => value);
+  if (title) title.textContent = property.title;
+  content.innerHTML = `
+    <div class="public-detail-layout">
+      <section class="public-detail-gallery">
+        <div class="public-detail-main-photo">${mainPhoto ? `<img src="${mainPhoto}" alt="Foto de ${escapeHtml(property.title)}">` : "<span>Sem foto principal</span>"}</div>
+        <div class="public-detail-thumbs">
+          ${photos
+            .slice(0, 6)
+            .map((photo) => {
+              const src = getPhotoSrc(photo);
+              return src ? `<img src="${src}" alt="${escapeHtml(photo.label || property.title)}">` : "";
+            })
+            .join("")}
+        </div>
+      </section>
+      <aside class="public-detail-info">
+        <span class="pill purpose-pill">${escapeHtml(property.purpose || "Imovel")}</span>
+        <h3>${escapeHtml(formatter.format(propertyNetValue(property)))}</h3>
+        <p>${escapeHtml(propertyLocation(property) || "Localizacao sob consulta")}</p>
+        <div class="public-detail-grid">
+          ${details.map(([label, value]) => `<article><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></article>`).join("")}
+        </div>
+        ${property.notes ? `<p>${escapeHtml(property.notes)}</p>` : ""}
+        <div class="site-card-actions">
+          <a class="submit-button" href="${escapeHtml(publicContactHref(property))}" target="_blank" rel="noopener">Tenho interesse</a>
+          <a class="secondary-button" href="${escapeHtml(propertyGoogleMapsLink(property))}" target="_blank" rel="noopener">Abrir mapa</a>
+        </div>
+      </aside>
+      <section class="public-detail-map">
+        ${map ? `<iframe src="${escapeHtml(map)}" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>` : `<a class="secondary-button" href="${escapeHtml(propertyGoogleMapsLink(property))}" target="_blank" rel="noopener">Ver localizacao no mapa</a>`}
+      </section>
+    </div>
+  `;
+  modal.hidden = false;
 }
 
 function setAppMode(authenticated = state.authenticated) {
@@ -2191,18 +2568,11 @@ function isValidLogin(email, password) {
   const normalizedEmail = normalize(email);
   const user = state.team.find((member) => member.status === "Ativo" && normalize(member.email) === normalizedEmail);
   if (!user) return false;
-  if (user.passwordResetAuthorized) {
+  if (!user.passwordSet) {
     user.password = password;
     user.passwordSet = true;
     user.passwordResetAuthorized = false;
     user.resetRequested = false;
-    state.currentUserId = user.id;
-    saveAll();
-    return true;
-  }
-  if (!user.passwordSet) {
-    user.password = password;
-    user.passwordSet = true;
     state.currentUserId = user.id;
     saveAll();
     return true;
@@ -2220,17 +2590,26 @@ function applyAccessControls() {
 
   const activeView = document.querySelector(".view.active")?.dataset.view;
   if (activeView && !canOpenView(activeView)) {
-    const fallback = Array.from(document.querySelectorAll("[data-view-link]")).find((link) => !link.hidden)?.dataset.viewLink || "painel";
-    setView(fallback);
+    setView(firstAvailableView());
   }
 
   document.querySelector("[data-scroll-target]")?.toggleAttribute("hidden", !canWrite("Cadastros"));
-  document.querySelectorAll("[data-form-tab='property'], [data-form-tab='owner']").forEach((button) => {
-    button.hidden = !canWrite("Cadastros") && !canWrite("Imoveis");
+  const formAccess = {
+    owner: canWrite("Cadastros"),
+    property: canWrite("Cadastros"),
+    client: canWrite("Clientes") || canWrite("Cadastros"),
+  };
+  document.querySelectorAll("[data-form-tab]").forEach((button) => {
+    button.hidden = !formAccess[button.dataset.formTab];
   });
-  document.querySelectorAll("[data-form-tab='client']").forEach((button) => {
-    button.hidden = !canWrite("Cadastros") && !canWrite("Clientes");
+  document.querySelectorAll("[data-form]").forEach((form) => {
+    form.hidden = !formAccess[form.dataset.form];
   });
+  const activeForm = document.querySelector("[data-form].active");
+  if (activeForm?.hidden) {
+    const fallbackForm = Object.entries(formAccess).find(([, allowed]) => allowed)?.[0];
+    if (fallbackForm) setForm(fallbackForm);
+  }
   document.querySelectorAll("[data-settings-tool]").forEach((button) => {
     button.hidden = !canUseSettingsTool(button.dataset.settingsTool);
   });
@@ -2248,6 +2627,7 @@ function render() {
   renderOwners();
   renderTeam();
   renderOperationalOptions();
+  renderListFilterOptions();
   renderAppointments();
   renderInvoices();
   renderOwnerOptions();
@@ -2400,7 +2780,8 @@ function renderInvoiceProfile(invoice) {
     </div>
     ${renderInvoiceBooklet(invoice)}
     <div class="profile-actions">
-      <button class="submit-button" type="button" data-download-invoice="${invoice.id}">Baixar PDF</button>
+      <button class="submit-button" type="button" data-download-invoice="${invoice.id}">Baixar fatura individual</button>
+      ${invoiceBookletItems(invoice).length > 1 ? `<button class="secondary-button" type="button" data-download-invoice-booklet="${invoice.id}">Baixar carne completo</button>` : ""}
       ${canEditEntity("invoice") ? `<button class="secondary-button" type="button" data-pay-invoice="${invoice.id}" ${status === "Inativa" || status === "Aguardando" ? "disabled" : ""}>${status === "Inativa" ? "Finalizada" : status === "Aguardando" ? "Aguardando liberacao" : "Registrar pagamento"}</button>` : ""}
       ${canDeleteEntity("invoice") ? '<button class="danger-button" type="button" data-delete-entity="invoice">Excluir fatura</button>' : ""}
     </div>
@@ -2415,6 +2796,7 @@ function renderInvoiceBooklet(invoice) {
       <div class="invoice-title-line">
         <strong>Carne de ${invoice.category === "Compra" ? "venda" : "locacao"}</strong>
         <span>${booklet.length} parcelas</span>
+        <button class="secondary-button" type="button" data-download-invoice-booklet="${invoice.id}">Baixar carne completo</button>
       </div>
       <div class="invoice-booklet-list">
         ${booklet
@@ -2468,6 +2850,13 @@ function renderContractProfile(contract) {
               ${Number(contract.securityDeposit || 0) > 0 ? `<p><strong>Caucao:</strong> ${formatter.format(Number(contract.securityDeposit || 0))}</p>` : ""}
               <p><strong>Vencimento calculado:</strong> ${escapeHtml(dueDate || "Nao informado")}${days !== null && days >= 0 ? ` - ${days === 0 ? "vence hoje" : `faltam ${days} dia${days > 1 ? "s" : ""}`}` : ""}</p>
             `
+            : contract.type === "Avulso"
+              ? `
+                <p><strong>Categoria:</strong> ${escapeHtml(contract.seasonCategory || "Temporada")}</p>
+                <p><strong>Valor avulso:</strong> ${formatter.format(Number(contract.oneOffValue || contract.amount || 0))}</p>
+                <p><strong>Entrada:</strong> ${escapeHtml(formatDate(contract.seasonStart) || contract.seasonStart || "Nao informado")}</p>
+                <p><strong>Saida:</strong> ${escapeHtml(formatDate(contract.seasonEnd) || contract.seasonEnd || "Nao informado")}</p>
+              `
             : `
               <p><strong>Valor total:</strong> ${formatter.format(Number(contract.negotiatedValue || contract.amount || 0))}</p>
               <p><strong>Valor da entrada:</strong> ${formatter.format(Number(contract.downPayment || 0))}</p>
@@ -2520,7 +2909,28 @@ function renderContractPdfPreview(contract) {
       <h3>${escapeHtml(data.title)}</h3>
       ${contract.signedDocument?.data ? `<p><strong>Contrato assinado anexado:</strong> ${escapeHtml(contract.signedDocument.label || contract.signedDocument.name || "arquivo assinado")}</p>` : ""}
       ${previewParagraphs.map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`).join("")}
+      ${renderContractSignaturePreview(contract)}
     </div>
+  `;
+}
+
+function renderContractSignaturePreview(contract) {
+  const signatures = Array.isArray(contract.signatures) ? contract.signatures.filter((signature) => signature.signature) : [];
+  if (!signatures.length) return "";
+  return `
+    <section class="contract-signature-preview">
+      ${signatures
+        .map(
+          (signature) => `
+            <article>
+              <img src="${escapeHtml(signature.signature)}" alt="Assinatura de ${escapeHtml(signature.name)}">
+              <span>${escapeHtml(signature.name)}</span>
+              <small>${escapeHtml(signature.role)}</small>
+            </article>
+          `,
+        )
+        .join("")}
+    </section>
   `;
 }
 
@@ -2545,8 +2955,9 @@ function renderContractModelEditor(contractId) {
   const contract = findContract(contractId);
   if (!contract) return;
   const defaultTemplates = state.company.contractTemplates || defaultContractTemplates();
-  const baseTemplate = contract.template || (contract.type === "Locacao" ? defaultTemplates.locacao : defaultTemplates.compra);
-  const modelName = contract.type === "Locacao" ? "locacao" : "venda";
+  const templateKey = contractTemplateKey(contract);
+  const baseTemplate = contract.template || defaultTemplates[templateKey];
+  const modelName = contract.type === "Locacao" ? "locacao" : contract.type === "Avulso" ? "avulso" : "venda";
   document.querySelector("#profile-kind").textContent = "Editar";
   document.querySelector("#profile-title").textContent = `Modelo de ${modelName}`;
   document.querySelector("#profile-content").innerHTML = `
@@ -2578,39 +2989,26 @@ function renderContractModelEditor(contractId) {
 function renderContractSignatureForm(contractId) {
   const contract = findContract(contractId);
   if (!contract || contract.signed || contract.rescinded) return;
-  const parties = contractSignatureParties(contract);
   state.activeProfile = { type: "contract", id: contract.id };
   document.querySelector("#profile-modal").hidden = false;
   document.querySelector("#profile-kind").textContent = "Assinatura";
   document.querySelector("#profile-title").textContent = "Assinar contrato";
   document.querySelector("#profile-content").innerHTML = `
     <form class="settings-panel signature-form" data-sign-contract-form="${contract.id}">
-      <p>Escolha uma forma de assinatura: preencha as assinaturas eletronicas dos envolvidos ou anexe o contrato ja assinado. Se usar as duas opcoes, ambas ficarao salvas.</p>
-      <div class="signature-grid">
-        ${parties
-          .map(
-            (party, index) => `
-              <label>
-                ${escapeHtml(party.role)} - ${escapeHtml(party.name)}
-                <input name="signature_${index}" placeholder="Digite a assinatura eletronica">
-              </label>
-              <input type="hidden" name="role_${index}" value="${escapeHtml(party.role)}">
-              <input type="hidden" name="name_${index}" value="${escapeHtml(party.name)}">
-              <input type="hidden" name="key_${index}" value="${escapeHtml(party.key)}">
-            `,
-          )
-          .join("")}
+      <p>Anexe o contrato ja assinado para finalizar este contrato no sistema. O arquivo enviado ficara disponivel para download no perfil do contrato.</p>
+      <div class="section-title full">
+        <p class="eyebrow">Upload</p>
+        <h3>Contrato assinado</h3>
       </div>
-      <input type="hidden" name="signatureCount" value="${parties.length}">
       <label class="upload-tile full">
-        <input name="signedDocument" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" data-signed-document-upload />
+        <input name="signedDocument" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" data-signed-document-upload required />
         <span class="upload-icon">+</span>
         <strong>Adicionar contrato assinado</strong>
-        <small>Opcional como complemento ou como forma principal de assinatura. Se enviado, este arquivo ficara disponivel para download.</small>
+        <small>Envie PDF, DOC, DOCX, JPG ou PNG de ate 2 MB.</small>
       </label>
       <div class="file-preview signed-document-preview full" id="signed-document-preview"></div>
       <div class="modal-actions">
-        <button class="submit-button" type="submit">Salvar assinaturas</button>
+        <button class="submit-button" type="submit">Salvar contrato assinado</button>
         <button class="secondary-button" type="button" data-back-contract-profile="${contract.id}">Cancelar</button>
       </div>
     </form>
@@ -2735,6 +3133,10 @@ function renderSummaryTab(type, entity) {
                   <span></span>
                   ${entity.available ? "Disponivel" : "Indisponivel"}
                 </label>
+                <button class="featured-toggle ${entity.featured ? "active" : ""}" type="button" ${canEditEntity("property") ? "" : "disabled"} data-featured-toggle aria-pressed="${entity.featured ? "true" : "false"}" title="Marcar imovel como destaque">
+                  <span aria-hidden="true">${entity.featured ? "★" : "☆"}</span>
+                  Destaque na Home
+                </button>
               </div>
               ${propertyDetails}
               ${renderPropertyMap(entity)}
@@ -2770,7 +3172,9 @@ function renderPropertyDetails(entity, owner) {
     owner.address ? `<p><strong>Endereco do proprietario:</strong> ${escapeHtml(owner.address)}</p>` : "",
     entity.type ? `<p><strong>Tipo:</strong> ${escapeHtml(entity.type)}</p>` : "",
     entity.subtype ? `<p><strong>Especificacao:</strong> ${escapeHtml(entity.subtype)}</p>` : "",
-    hasPositiveNumber(entity.price) ? `<p><strong>Valor:</strong> ${formatter.format(Number(entity.price || 0))}</p>` : "",
+    hasPositiveNumber(propertyNetValue(entity)) ? `<p><strong>Valor liquido:</strong> ${formatter.format(propertyNetValue(entity))}</p>` : "",
+    hasPositiveNumber(propertyGrossValue(entity)) ? `<p><strong>Valor bruto:</strong> ${formatter.format(propertyGrossValue(entity))}</p>` : "",
+    propertyProfitValue(entity) ? `<p><strong>Lucro previsto:</strong> ${formatter.format(propertyProfitValue(entity))} (${propertyProfitPercent(entity).toFixed(1)}%)</p>` : "",
     hasPositiveNumber(entity.iptu) ? `<p><strong>IPTU:</strong> ${formatter.format(Number(entity.iptu || 0))}</p>` : "",
     propertyLocation(entity) ? `<p><strong>Localizacao:</strong> ${escapeHtml(propertyLocation(entity))}</p>` : "",
     hasPositiveNumber(entity.rooms) ? `<p><strong>Quartos:</strong> ${escapeHtml(entity.rooms)}</p>` : "",
@@ -2956,7 +3360,7 @@ function renderContractItem(contract) {
       <button class="contract-card-download" type="button" data-download-contract="${contract.id}" title="Baixar contrato" aria-label="Baixar contrato">↓</button>
       <div>
         <div class="invoice-title-line">
-          <strong>Contrato de ${escapeHtml(contract.type)}</strong>
+          <strong>Contrato de ${escapeHtml(contractTypeLabel(contract))}</strong>
           <span class="invoice-status ${statusClass}">${escapeHtml(contract.rescinded ? "Rescindido" : status)}</span>
         </div>
         <p>${escapeHtml(property?.title || "Imovel removido")} &middot; ${escapeHtml(client?.name || "Cliente removido")} &middot; ${formatter.format(amount)}</p>
@@ -2979,17 +3383,11 @@ const settingsTools = {
     description: "Itens excluidos ficam disponiveis por 30 dias ou ate esvaziar manualmente.",
   },
   users: { title: "Usuarios", description: "Controle simples da equipe e niveis de acesso." },
-  password: { title: "Minha senha", description: "Altere a senha do usuario logado." },
-  whatsapp: { title: "WhatsApp", description: "Configure mensagem padrao e lembretes de contratos." },
-  invoices: { title: "Modelo de contrato", description: "Textos, variaveis e regras do PDF de contratos." },
+  whatsapp: { title: "WhatsApp", description: "Configure atendimento, mensagem padrao e dados para conexao com WhatsApp Cloud API." },
   notifications: { title: "Notificacoes", description: "Alertas de vencimento, tarefas e retorno comercial." },
-  security: { title: "Seguranca", description: "Boas praticas de acesso e privacidade dos dados." },
-  backup: { title: "Backup", description: "Exportacao local dos dados salvos no navegador." },
+  backup: { title: "Backup", description: "Exportacao local completa dos dados salvos no navegador." },
   appearance: { title: "Aparencia", description: "Identidade visual baseada na marca Regis Imobiliaria." },
   reports: { title: "Relatorios", description: "Indicadores basicos da carteira e dos contratos." },
-  cities: { title: "Cidades", description: "Regioes, bairros e cidades atendidas." },
-  integrations: { title: "Integracoes", description: "Espaco reservado para portais, API e automacoes." },
-  templates: { title: "Modelos", description: "Modelos de contratos, propostas e mensagens." },
   help: { title: "Ajuda", description: "Resumo operacional do sistema." },
 };
 
@@ -3012,12 +3410,9 @@ function renderSettingsTool(tool, config) {
   if (tool === "appearance") return renderAppearanceSettings();
   if (tool === "trash") return renderTrashSettings();
   if (tool === "users") return renderUsersSettings();
-  if (tool === "password") return renderPasswordSettings();
   if (tool === "whatsapp") return renderWhatsAppSettings();
-  if (tool === "invoices") return renderContractTemplateSettings();
   if (tool === "backup") return renderBackupSettings(config);
   if (tool === "reports") return renderReportsSettings(config);
-  if (tool === "integrations") return renderIntegrationsSettings();
   if (tool === "help") return renderHelpSettings();
 
   return `
@@ -3193,25 +3588,7 @@ function renderUsersSettings() {
           <div class="team-list" id="settings-team-list"></div>
         </section>
       </div>
-      ${renderPasswordSettings()}
     </section>
-  `;
-}
-
-function renderPasswordSettings() {
-  const user = activeUser();
-  return `
-    <form class="panel form-grid active change-password-panel" id="change-password-form">
-      <div class="full">
-        <p class="eyebrow">Senha</p>
-        <h2>Alterar minha senha</h2>
-        <p class="empty-inline">Usuario atual: ${escapeHtml(user?.name || user?.email || "Nao identificado")}</p>
-      </div>
-      <label>Senha atual<input name="currentPassword" type="password" required /></label>
-      <label>Nova senha<input name="newPassword" type="password" required minlength="4" /></label>
-      <label>Confirmar nova senha<input name="confirmPassword" type="password" required minlength="4" /></label>
-      <button class="submit-button" type="submit">Atualizar senha</button>
-    </form>
   `;
 }
 
@@ -3234,7 +3611,7 @@ function renderHelpSettings() {
         </article>
         <article class="help-card">
           <strong>3. Contratos</strong>
-          <p>Emita contratos de locacao ou venda, baixe o PDF, colete assinaturas eletronicas ou anexe o contrato assinado. Contratos rescindidos ficam inativos.</p>
+          <p>Emita contratos de locacao, venda ou avulso, baixe o PDF e anexe o contrato assinado para finalizar. Contratos rescindidos ficam inativos.</p>
         </article>
         <article class="help-card">
           <strong>4. Faturas</strong>
@@ -3246,7 +3623,7 @@ function renderHelpSettings() {
         </article>
         <article class="help-card">
           <strong>6. Configuracoes</strong>
-          <p>Atualize perfil da empresa, logo, temas, WhatsApp, modelos, backup e lixeira. Essas informacoes aparecem em documentos e PDFs do sistema.</p>
+          <p>Atualize perfil da empresa, logo, temas, WhatsApp, backup e lixeira. Essas informacoes aparecem em documentos e PDFs do sistema.</p>
         </article>
       </div>
       <section class="help-flow">
@@ -3264,14 +3641,60 @@ function renderHelpSettings() {
 }
 
 function renderWhatsAppSettings() {
+  const whatsapp = state.company.whatsapp || {};
   return `
-    <form class="settings-panel settings-options" data-whatsapp-form>
-      <p>Configure o numero de envio e a mensagem padrao das faturas de locacao. O sistema prepara o texto para envio 3 dias antes do vencimento; envio automatico real exige integracao com WhatsApp/API.</p>
-      <label>Numero remetente<input name="sender" value="${escapeHtml(state.company.whatsapp?.sender || "")}" placeholder="5513999990000" /></label>
-      <label class="full">Modelo da mensagem<textarea name="message" rows="6">${escapeHtml(state.company.whatsapp?.message || "")}</textarea></label>
-      <p class="empty-inline">Variaveis: {{cliente_nome}}, {{categoria}}, {{valor}}, {{vencimento}}, {{imovel_titulo}}, {{empresa_nome}}</p>
-      <div class="modal-actions full">
+    <form class="settings-panel whatsapp-settings" data-whatsapp-form>
+      <section class="integration-card">
+        <div>
+          <p class="eyebrow">Atendimento</p>
+          <h3>Botao WhatsApp do site</h3>
+          <p>Use o numero em formato internacional. Este numero alimenta o botao publico de contato e as mensagens preparadas nas faturas.</p>
+        </div>
+        <label>Numero principal/remetente<input name="sender" value="${escapeHtml(whatsapp.sender || "")}" placeholder="5513999990000" /></label>
+        <label>Status da conexao<input value="${escapeHtml(whatsapp.connectionStatus || (whatsapp.cloudApiEnabled === "Sim" ? "Pronto para conectar" : "Modo link wa.me"))}" readonly /></label>
+      </section>
+
+      <section class="integration-card">
+        <div>
+          <p class="eyebrow">Mensagem padrao</p>
+          <h3>Faturas e lembretes</h3>
+          <p>O sistema monta o texto automaticamente usando as variaveis abaixo. O envio automatico real depende do backend conectado a API oficial.</p>
+        </div>
+        <label class="full">Modelo da mensagem<textarea name="message" rows="6">${escapeHtml(whatsapp.message || "")}</textarea></label>
+        <p class="empty-inline full">Variaveis: {{cliente_nome}}, {{categoria}}, {{valor}}, {{vencimento}}, {{imovel_titulo}}, {{empresa_nome}}</p>
+      </section>
+
+      <section class="integration-card">
+        <div>
+          <p class="eyebrow">WhatsApp Cloud API</p>
+          <h3>Pronto para conectar</h3>
+          <p>Preencha os dados do Meta Developers. Em producao, o access token deve ficar no backend, nao no navegador.</p>
+        </div>
+        <label>Cloud API<select name="cloudApiEnabled">
+          <option value="Nao" ${whatsapp.cloudApiEnabled !== "Sim" ? "selected" : ""}>Nao</option>
+          <option value="Sim" ${whatsapp.cloudApiEnabled === "Sim" ? "selected" : ""}>Sim</option>
+        </select></label>
+        <label>Phone Number ID<input name="phoneNumberId" value="${escapeHtml(whatsapp.phoneNumberId || "")}" placeholder="ID do numero no Meta" /></label>
+        <label>Business Account ID<input name="businessAccountId" value="${escapeHtml(whatsapp.businessAccountId || "")}" placeholder="WABA ID" /></label>
+        <label>App ID<input name="appId" value="${escapeHtml(whatsapp.appId || "")}" placeholder="App ID do Meta" /></label>
+        <label>Webhook verify token<input name="webhookVerifyToken" value="${escapeHtml(whatsapp.webhookVerifyToken || "")}" placeholder="Token para validar webhook" /></label>
+        <label>URL do webhook<input name="webhookUrl" value="${escapeHtml(whatsapp.webhookUrl || "")}" placeholder="https://api.suaimobiliaria.com/webhooks/whatsapp" /></label>
+        <label class="full">Access token<input name="accessToken" value="${escapeHtml(whatsapp.accessToken || "")}" placeholder="Use somente para teste local; em producao fica no backend" /></label>
+      </section>
+
+      <section class="integration-card">
+        <div>
+          <p class="eyebrow">Teste</p>
+          <h3>Mensagem de verificacao</h3>
+          <p>Preencha um numero e uma mensagem para deixar o teste preparado quando o backend/API estiver conectado.</p>
+        </div>
+        <label>Numero de teste<input name="testTo" value="${escapeHtml(whatsapp.testTo || "")}" placeholder="5513999990000" /></label>
+        <label class="full">Mensagem de teste<textarea name="testMessage" rows="3">${escapeHtml(whatsapp.testMessage || "Teste de conexao WhatsApp - Regis Imobiliaria")}</textarea></label>
+      </section>
+
+      <div class="modal-actions">
         <button class="submit-button" type="submit">Salvar WhatsApp</button>
+        <a class="secondary-button" href="https://developers.facebook.com/docs/whatsapp/cloud-api/get-started" target="_blank" rel="noopener">Documentacao Cloud API</a>
       </div>
     </form>
   `;
@@ -3301,6 +3724,11 @@ function renderContractTemplateSettings() {
         <h3>Modelo de venda</h3>
         <label>Titulo principal<input name="compraTitle" value="${escapeHtml(templates.compra.title)}" /></label>
         <label class="full">Texto do contrato<textarea name="compraBody" rows="16" data-template-body="compra">${escapeHtml(templates.compra.body)}</textarea></label>
+      </section>
+      <section class="template-box">
+        <h3>Modelo avulso</h3>
+        <label>Titulo principal<input name="avulsoTitle" value="${escapeHtml(templates.avulso.title)}" /></label>
+        <label class="full">Texto do contrato<textarea name="avulsoBody" rows="16" data-template-body="avulso">${escapeHtml(templates.avulso.body)}</textarea></label>
       </section>
       <div class="modal-actions">
         <button class="submit-button" type="submit">Salvar modelos</button>
@@ -3417,15 +3845,49 @@ function renderTrashSettings() {
 }
 
 function renderBackupSettings(config) {
+  const backup = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    company: state.company,
+    properties: state.properties,
+    clients: state.clients,
+    owners: state.owners,
+    contracts: state.contracts,
+    appointments: state.appointments,
+    invoices: state.invoices,
+    team: state.team,
+    trash: state.trash,
+  };
+  const json = JSON.stringify(backup, null, 2);
   return `
-    <section class="settings-panel">
+    <section class="settings-panel backup-panel">
       <p>${escapeHtml(config.description)}</p>
-      <textarea readonly rows="8">${escapeHtml(JSON.stringify({ properties: state.properties, clients: state.clients, owners: state.owners, contracts: state.contracts }, null, 2))}</textarea>
+      <div class="invoice-summary">
+        <article class="invoice-metric"><span>Imoveis</span><strong>${state.properties.length}</strong></article>
+        <article class="invoice-metric"><span>Clientes</span><strong>${state.clients.length}</strong></article>
+        <article class="invoice-metric"><span>Contratos</span><strong>${state.contracts.length}</strong></article>
+        <article class="invoice-metric"><span>Faturas</span><strong>${state.invoices.length}</strong></article>
+      </div>
+      <div class="modal-actions">
+        <button class="submit-button" type="button" data-download-backup>Baixar backup JSON</button>
+        <label class="secondary-button">
+          Restaurar backup
+          <input type="file" accept="application/json,.json" data-restore-backup hidden />
+        </label>
+      </div>
+      <p class="empty-inline">O arquivo inclui empresa, imoveis, clientes, proprietarios, contratos, agendamentos, faturas, usuarios e lixeira. Guarde em local seguro.</p>
+      <textarea readonly rows="10">${escapeHtml(json)}</textarea>
     </section>
   `;
 }
 
 function renderReportsSettings(config) {
+  const gross = state.properties.reduce((sum, property) => sum + propertyGrossValue(property), 0);
+  const net = state.properties.reduce((sum, property) => sum + propertyNetValue(property), 0);
+  const profit = state.properties.reduce((sum, property) => sum + propertyProfitValue(property), 0);
+  const monthlyRentProfit = state.properties
+    .filter((property) => property.purpose === "Locacao")
+    .reduce((sum, property) => sum + propertyProfitValue(property), 0);
   return `
     <section class="settings-panel">
       <p>${escapeHtml(config.description)}</p>
@@ -3434,15 +3896,31 @@ function renderReportsSettings(config) {
         <article class="invoice-metric"><span>Clientes</span><strong>${state.clients.length}</strong></article>
         <article class="invoice-metric"><span>Proprietarios</span><strong>${state.owners.length}</strong></article>
         <article class="invoice-metric"><span>Contratos</span><strong>${state.contracts.length}</strong></article>
+        <article class="invoice-metric"><span>Valor bruto</span><strong>${formatter.format(gross)}</strong></article>
+        <article class="invoice-metric"><span>Valor liquido</span><strong>${formatter.format(net)}</strong></article>
+        <article class="invoice-metric"><span>Lucro previsto</span><strong>${formatter.format(profit)}</strong></article>
+        <article class="invoice-metric"><span>Lucro mensal locacao</span><strong>${formatter.format(monthlyRentProfit)}</strong></article>
       </div>
     </section>
   `;
 }
 
+function contractTemplateKey(contract) {
+  if (contract.type === "Locacao") return "locacao";
+  if (contract.type === "Avulso") return "avulso";
+  return "compra";
+}
+
+function contractTypeLabel(contract) {
+  if (contract?.type === "Locacao") return "Locacao";
+  if (contract?.type === "Avulso") return "Avulso por temporada";
+  return "Compra e venda";
+}
+
 function contractTitle(contract) {
   const templates = state.company.contractTemplates || defaultContractTemplates();
-  const template = contract.template || (contract.type === "Locacao" ? templates.locacao : templates.compra);
-  return template?.title || (contract.type === "Locacao" ? "CONTRATO PARTICULAR DE LOCACAO DE IMOVEL" : "CONTRATO PARTICULAR DE COMPRA E VENDA DE IMOVEL");
+  const template = contract.template || templates[contractTemplateKey(contract)];
+  return template?.title || defaultContractTemplates()[contractTemplateKey(contract)].title;
 }
 
 function contractFileName(contract, property, client) {
@@ -3467,7 +3945,7 @@ function contractTemplateValues(contract, { property, client, owner, company }) 
     empresa_cnpj: company.cnpj || "nao informado",
     empresa_creci: company.creci || "nao informado",
     empresa_endereco: company.address || "nao informado",
-    contrato_tipo: contract.type === "Locacao" ? "Locacao" : "Compra e venda",
+    contrato_tipo: contractTypeLabel(contract),
     data_emissao: formatDate(contract.issuedAt || new Date().toISOString()),
     data_vencimento: contractDueDate(contract) || "nao se aplica",
     prazo_meses: contract.termMonths || "nao se aplica",
@@ -3475,6 +3953,10 @@ function contractTemplateValues(contract, { property, client, owner, company }) 
     valor_caucao: formatter.format(Number(contract.securityDeposit || 0)),
     valor_entrada: formatter.format(Number(contract.downPayment || 0)),
     valor_total_venda: formatter.format(Number(contract.negotiatedValue || contract.amount || 0)),
+    valor_avulso: formatter.format(Number(contract.oneOffValue || contract.amount || 0)),
+    data_entrada: formatDate(contract.seasonStart) || contract.seasonStart || "nao informado",
+    data_saida: formatDate(contract.seasonEnd) || contract.seasonEnd || "nao informado",
+    categoria_temporada: contract.seasonCategory || "Temporada",
     imovel_titulo: property?.title || "nao informado",
     imovel_tipo: [property?.type, property?.subtype].filter(Boolean).join(" / ") || "nao informado",
     imovel_endereco: propertyAddress(property),
@@ -3519,14 +4001,14 @@ function contractTextBlocks(contract) {
   const owner = property ? propertyOwner(property) : null;
   const company = state.company;
   const templates = company.contractTemplates || defaultContractTemplates();
-  const template = contract.template || (contract.type === "Locacao" ? templates.locacao : templates.compra);
+  const template = contract.template || templates[contractTemplateKey(contract)];
   const values = contractTemplateValues(contract, { property, client, owner, company });
   const body = fillContractTemplate(template?.body, values);
   const paragraphs = body.split(/\n{2,}/).map((paragraph) => paragraph.trim()).filter(Boolean);
   if (contract.signed && contract.signatures?.length) {
     paragraphs.push(
       `ASSINATURAS ELETRONICAS: Documento assinado eletronicamente em ${formatDate(contract.signedAt)} pelas partes abaixo.`,
-      ...contract.signatures.map((signature) => `${signature.role}: ${signature.name} - Assinatura: ${signature.signature}`),
+      ...contract.signatures.map((signature) => `${signature.role}: ${signature.name} - Assinatura digital coletada.`),
     );
   }
   if (contract.rescinded) {
@@ -3701,18 +4183,24 @@ async function downloadContractPdf(contractId, documentType = "") {
 
   doc.text(`${data.property?.city || "Cidade"}, ${new Date().toLocaleDateString("pt-BR")}.`, left, y);
   y += 26;
-  const signatures = [
-    data.owner?.name || "Proprietario",
-    data.client?.name || "Cliente",
-    state.company.name || "Imobiliaria",
-  ];
-  signatures.forEach((name) => {
+  const signatures = contract.signatures?.length
+    ? contract.signatures
+    : [
+        { name: data.owner?.name || "Proprietario", role: "Proprietario" },
+        { name: data.client?.name || "Cliente", role: "Cliente" },
+        { name: state.company.name || "Imobiliaria", role: "Imobiliaria" },
+      ];
+  signatures.forEach((signature) => {
     if (y > 270) {
       doc.addPage();
       y = 35;
     }
+    if (signature.signature?.startsWith("data:image")) {
+      doc.addImage(signature.signature, "PNG", left, y - 17, 70, 18, undefined, "FAST");
+    }
     doc.line(left, y, left + 70, y);
-    doc.text(name, left, y + 6);
+    doc.text(signature.name || "Assinatura", left, y + 6);
+    if (signature.role) doc.text(signature.role, left, y + 11);
     y += 22;
   });
 
@@ -3867,19 +4355,17 @@ function invoiceFileName(invoice, client) {
   return slugify(`fatura-${invoice.category}-${client?.name || "cliente"}-${invoice.dueDate || invoice.createdAt || ""}`) || "fatura";
 }
 
-function downloadInvoicePdf(invoiceId) {
-  const invoice = state.invoices.find((item) => item.id === invoiceId);
-  if (!invoice) return;
+function invoicePdfLines(invoice, title = "FATURA DE COBRANCA") {
   const client = findClient(invoice.clientId);
   const property = findProperty(invoice.propertyId);
   const contract = findContract(invoice.contractId);
   const status = invoiceComputedStatus(invoice);
-  const lines = [
+  return [
     state.company.name || "Regis Imobiliaria",
     `${state.company.legalName || ""} ${state.company.cnpj ? `CNPJ: ${state.company.cnpj}` : ""} ${state.company.creci ? `CRECI: ${state.company.creci}` : ""}`.trim(),
     state.company.address ? `Endereco: ${state.company.address}` : "",
     "",
-    "FATURA DE COBRANCA",
+    title,
     `Categoria: ${invoice.category}`,
     `Status: ${status}`,
     `Emissao: ${formatDate(invoice.createdAt) || new Date().toLocaleDateString("pt-BR")}`,
@@ -3924,6 +4410,13 @@ function downloadInvoicePdf(invoiceId) {
     "________________________________________",
     client?.name || "Cliente",
   ].filter((line) => line !== "");
+}
+
+function downloadInvoicePdf(invoiceId) {
+  const invoice = state.invoices.find((item) => item.id === invoiceId);
+  if (!invoice) return;
+  const client = findClient(invoice.clientId);
+  const lines = invoicePdfLines(invoice);
   const pdf = buildBasicPdf(lines);
   const blob = new Blob([pdf], { type: "application/pdf" });
   const url = URL.createObjectURL(blob);
@@ -3934,6 +4427,97 @@ function downloadInvoicePdf(invoiceId) {
   link.click();
   link.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function downloadInvoiceBookletPdf(invoiceId) {
+  const invoice = state.invoices.find((item) => item.id === invoiceId);
+  if (!invoice) return;
+  const booklet = invoiceBookletItems(invoice);
+  if (booklet.length <= 1) {
+    downloadInvoicePdf(invoiceId);
+    return;
+  }
+  const client = findClient(invoice.clientId);
+  const title = `CARNE DE ${invoice.category === "Compra" ? "VENDA" : "LOCACAO"}`;
+  const header = [
+    title,
+    `Cliente: ${client?.name || "Nao informado"}`,
+    `Total de parcelas: ${booklet.length}`,
+    "",
+  ];
+  const lines = booklet.flatMap((item, index) => [
+    ...(index === 0 ? header : ["", ""]),
+    `FATURA ${index + 1} DE ${booklet.length}`,
+    ...invoicePdfLines(item, "FATURA DO CARNE").slice(5),
+    "",
+    "------------------------------------------------------------",
+  ]);
+  const pdf = buildBasicPdf(lines);
+  const blob = new Blob([pdf], { type: "application/pdf" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${slugify(`carne-${invoice.category}-${client?.name || "cliente"}-${invoice.bookletId}`) || "carne"}.pdf`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function backupPayload() {
+  return {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    company: state.company,
+    properties: state.properties,
+    clients: state.clients,
+    owners: state.owners,
+    contracts: state.contracts,
+    appointments: state.appointments,
+    invoices: state.invoices,
+    team: state.team,
+    trash: state.trash,
+  };
+}
+
+function downloadBackup() {
+  const blob = new Blob([JSON.stringify(backupPayload(), null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `backup-regis-imobiliaria-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function restoreBackupFile(file) {
+  const reader = new FileReader();
+  reader.addEventListener("load", () => {
+    try {
+      const data = JSON.parse(reader.result);
+      const confirmed = window.confirm("Restaurar este backup vai substituir os dados atuais deste navegador. Continuar?");
+      if (!confirmed) return;
+      state.company = ensureCompany(data.company || {});
+      state.properties = ensureProperties(Array.isArray(data.properties) ? data.properties : []);
+      state.clients = ensureClients(Array.isArray(data.clients) ? data.clients : []);
+      state.owners = ensureOwners(Array.isArray(data.owners) ? data.owners : []);
+      state.contracts = ensureContracts(Array.isArray(data.contracts) ? data.contracts : []);
+      state.appointments = ensureAppointments(Array.isArray(data.appointments) ? data.appointments : []);
+      state.invoices = ensureInvoices(Array.isArray(data.invoices) ? data.invoices : []);
+      state.team = ensureTeam(Array.isArray(data.team) ? data.team : defaultTeam);
+      state.trash = ensureTrash(Array.isArray(data.trash) ? data.trash : []);
+      saveAll();
+      render();
+      openSettingsTool("backup");
+      showToast("Backup restaurado.");
+    } catch (error) {
+      showToast("Arquivo de backup invalido.");
+      console.error(error);
+    }
+  });
+  reader.readAsText(file);
 }
 
 function renderEditAppointmentProfile(appointment) {
@@ -3986,7 +4570,8 @@ function renderEditProfile(type, entity) {
               ${(propertyTypes[entity.type] || []).map((subtype) => `<option value="${subtype}" ${subtype === entity.subtype ? "selected" : ""}>${subtype}</option>`).join("")}
             </select></label>
             <label>Finalidade<input name="purpose" value="${escapeHtml(entity.purpose)}" required /></label>
-            <label>Valor<input name="price" type="number" value="${escapeHtml(entity.price || 0)}" required /></label>
+            <label>Valor bruto<input name="grossValue" type="number" value="${escapeHtml(propertyGrossValue(entity) || 0)}" required /></label>
+            <label>Valor liquido<input name="netValue" type="number" value="${escapeHtml(propertyNetValue(entity) || 0)}" required /></label>
             <label class="full">Localizacao Google Maps<input name="googleLocation" value="${escapeHtml(propertyLocation(entity))}" placeholder="Cole o link do Google Maps ou digite o endereco completo" required /></label>
             <section class="geo-grid full">
               <div class="section-title">
@@ -4101,27 +4686,17 @@ document.querySelector("#login-form")?.addEventListener("submit", (event) => {
   }
   setAppMode(true);
   closeLogin();
-  setView("painel");
+  render();
+  setView(firstAvailableView());
   event.currentTarget.reset();
   showToast("Acesso liberado.");
-});
-
-document.querySelector("#password-reset-request-form")?.addEventListener("submit", (event) => {
-  event.preventDefault();
-  const data = collectForm(event.currentTarget);
-  const member = state.team.find((item) => normalize(item.email) === normalize(data.email));
-  if (member) {
-    member.resetRequested = true;
-    saveAll();
-  }
-  event.currentTarget.reset();
-  showToast("Solicitacao registrada. Aguarde a liberacao do administrador.");
 });
 
 document.querySelector("[data-logout]")?.addEventListener("click", () => {
   setAppMode(false);
   closeProfile();
-  window.location.hash = "site-publico";
+  window.location.hash = "home";
+  setPublicPage("home");
   showToast("Voce saiu do sistema interno.");
 });
 
@@ -4141,6 +4716,59 @@ document.querySelectorAll("[data-public-filter]").forEach((field) => {
   field.addEventListener("change", () => {
     field.dispatchEvent(new Event("input"));
   });
+});
+
+document.addEventListener("click", (event) => {
+  const publicPageLink = event.target.closest("[data-public-page-link]");
+  if (publicPageLink) {
+    event.preventDefault();
+    const page = publicPageLink.dataset.publicPageLink;
+    window.location.hash = page;
+    setPublicPage(page);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    return;
+  }
+
+  const publicFeaturedButton = event.target.closest("[data-public-featured]");
+  if (publicFeaturedButton) {
+    event.preventDefault();
+    event.stopPropagation();
+    const featuredItems = state.properties.filter((property) => property.available !== false && property.featured);
+    if (featuredItems.length) {
+      state.publicHeroIndex =
+        publicFeaturedButton.dataset.publicFeatured === "next"
+          ? (state.publicHeroIndex + 1) % featuredItems.length
+          : (state.publicHeroIndex - 1 + featuredItems.length) % featuredItems.length;
+      renderPublicHeroV2();
+    }
+    return;
+  }
+
+  const publicFeaturedDot = event.target.closest("[data-public-featured-dot]");
+  if (publicFeaturedDot) {
+    event.preventDefault();
+    event.stopPropagation();
+    state.publicHeroIndex = Number(publicFeaturedDot.dataset.publicFeaturedDot);
+    renderPublicHeroV2();
+    return;
+  }
+
+  const publicPropertyTrigger = event.target.closest("[data-public-property]");
+  if (publicPropertyTrigger && !event.target.closest("a")) {
+    event.preventDefault();
+    renderPublicPropertyDetail(publicPropertyTrigger.dataset.publicProperty);
+    return;
+  }
+
+  if (event.target.closest("[data-close-public-property]")) {
+    document.querySelector("#public-property-modal").hidden = true;
+    return;
+  }
+
+});
+
+window.addEventListener("hashchange", () => {
+  if (!state.authenticated) setPublicPage(publicPageFromHash());
 });
 
 document.querySelectorAll("[data-view-link]").forEach((link) => {
@@ -4209,6 +4837,7 @@ document.querySelectorAll("[data-contract-tab]").forEach((button) => {
     const form = document.querySelector("#contract-form");
     form.querySelector("[name='type']").value = button.dataset.contractTab;
     updateContractTypeFields();
+    syncContractValueFromProperty();
   });
 });
 
@@ -4307,8 +4936,28 @@ function syncSaleInvoiceFromContract() {
   form.querySelector("[name='downPayment']").value = contract.downPayment || "";
 }
 
+function syncContractValueFromProperty(force = true) {
+  const form = document.querySelector("#contract-form");
+  if (!form) return;
+  const property = findProperty(form.querySelector("[name='propertyId']")?.value);
+  if (!property) return;
+  const net = propertyNetValue(property);
+  const type = form.querySelector("[name='type']")?.value;
+  if (type === "Locacao") {
+    const monthly = form.querySelector("[name='monthlyValue']");
+    if (monthly && (force || !monthly.value)) monthly.value = net || "";
+  } else if (type === "Compra") {
+    const total = form.querySelector("[name='negotiatedValue']");
+    if (total && (force || !total.value)) total.value = net || "";
+  } else if (type === "Avulso") {
+    const oneOff = form.querySelector("[name='oneOffValue']");
+    if (oneOff && (force || !oneOff.value)) oneOff.value = net || "";
+  }
+}
+
 document.querySelector("[data-invoice-form='Locacao'] [name='contractId']")?.addEventListener("change", syncLeaseInvoiceFromContract);
 document.querySelector("[data-invoice-form='Compra'] [name='contractId']")?.addEventListener("change", syncSaleInvoiceFromContract);
+document.querySelector("#contract-form [name='propertyId']")?.addEventListener("change", syncContractValueFromProperty);
 
 document.querySelector("#property-form [name='photos']").addEventListener("change", async (event) => {
   const input = event.currentTarget;
@@ -4411,6 +5060,8 @@ document.querySelector("#property-form").addEventListener("submit", (event) => {
   delete property.documents;
   property.id = createId("property");
   property.available = true;
+  property.featured = false;
+  property.price = property.netValue || property.grossValue || "";
   property.photos = [...state.selectedPropertyPhotos];
   property.documents = [...state.selectedPropertyDocs];
   state.properties.unshift(property);
@@ -4507,8 +5158,8 @@ function saveTeamFromForm(form) {
     permissions,
     password: existing?.password || "",
     passwordSet: Boolean(existing?.passwordSet),
-    resetRequested: Boolean(existing?.resetRequested),
-    passwordResetAuthorized: Boolean(existing?.passwordResetAuthorized),
+    resetRequested: false,
+    passwordResetAuthorized: false,
     notes: data.notes,
   };
 
@@ -4542,6 +5193,19 @@ document.addEventListener("submit", (event) => {
 });
 
 document.addEventListener("change", (event) => {
+  const backupInput = event.target.closest("[data-restore-backup]");
+  if (backupInput) {
+    if (!isAdmin()) {
+      showToast("Somente administrador pode restaurar backup.");
+      backupInput.value = "";
+      return;
+    }
+    const file = backupInput.files?.[0];
+    if (file) restoreBackupFile(file);
+    backupInput.value = "";
+    return;
+  }
+
   const accessLevel = event.target.closest("#settings-team-form [name='accessLevel'], #team-form [name='accessLevel']");
   if (!accessLevel) return;
   const form = accessLevel.closest("form");
@@ -4798,10 +5462,16 @@ document.querySelector("#contract-form").addEventListener("submit", (event) => {
   }
 
   const issuedAt = new Date().toISOString();
-  const amount = data.type === "Locacao" ? data.monthlyValue : data.negotiatedValue;
+  const liquidValue = propertyNetValue(property);
+  const amount =
+    data.type === "Locacao"
+      ? data.monthlyValue || liquidValue
+      : data.type === "Avulso"
+        ? data.oneOffValue || liquidValue
+        : data.negotiatedValue || liquidValue;
   const issuedDate = new Date(issuedAt);
   issuedDate.setMonth(issuedDate.getMonth() + Number(data.termMonths || 0));
-  const dueDate = data.type === "Locacao" ? issuedDate.toISOString().slice(0, 10) : "";
+  const dueDate = data.type === "Locacao" ? issuedDate.toISOString().slice(0, 10) : data.type === "Avulso" ? data.seasonEnd || "" : "";
   const hasGuarantor = data.type === "Locacao" && data.hasGuarantor === "Sim";
   const guarantor = hasGuarantor
     ? {
@@ -4823,12 +5493,16 @@ document.querySelector("#contract-form").addEventListener("submit", (event) => {
     propertyId: data.propertyId,
     clientId: data.clientId,
     type: data.type,
-    payerRole: data.type === "Compra" ? "Comprador" : "Inquilino",
+    payerRole: data.type === "Compra" ? "Comprador" : data.type === "Avulso" ? "Cliente" : "Inquilino",
     amount,
-    monthlyValue: data.type === "Locacao" ? data.monthlyValue : "",
-    negotiatedValue: data.type === "Compra" ? data.negotiatedValue : "",
+    monthlyValue: data.type === "Locacao" ? amount : "",
+    negotiatedValue: data.type === "Compra" ? amount : "",
+    oneOffValue: data.type === "Avulso" ? amount : "",
     downPayment: data.type === "Compra" ? data.downPayment : "",
     securityDeposit: data.type === "Locacao" ? data.securityDeposit : "",
+    seasonStart: data.type === "Avulso" ? data.seasonStart : "",
+    seasonEnd: data.type === "Avulso" ? data.seasonEnd : "",
+    seasonCategory: data.type === "Avulso" ? data.seasonCategory || "Temporada" : "",
     hasGuarantor: hasGuarantor ? "Sim" : "Nao",
     guarantor,
     termMonths: data.type === "Locacao" ? data.termMonths : "",
@@ -4861,10 +5535,12 @@ document.querySelector("#contract-form").addEventListener("submit", (event) => {
 });
 
 document.querySelectorAll("[data-filter]").forEach((input) => {
-  input.addEventListener("input", () => {
+  const updateFilter = () => {
     state.filters[input.dataset.filter] = input.value;
     render();
-  });
+  };
+  input.addEventListener("input", updateFilter);
+  input.addEventListener("change", updateFilter);
 });
 
 document.addEventListener("click", (event) => {
@@ -4876,25 +5552,6 @@ document.addEventListener("click", (event) => {
     }
     const member = state.team.find((item) => item.id === editTeamButton.dataset.editTeam);
     fillTeamForm(member);
-    return;
-  }
-
-  const authorizeResetButton = event.target.closest("[data-authorize-password-reset]");
-  if (authorizeResetButton) {
-    if (!canManageUsers()) {
-      showToast("Somente administrador pode liberar nova senha.");
-      return;
-    }
-    const member = state.team.find((item) => item.id === authorizeResetButton.dataset.authorizePasswordReset);
-    if (!member) return;
-    member.password = "";
-    member.passwordSet = false;
-    member.passwordResetAuthorized = true;
-    member.resetRequested = false;
-    saveAll();
-    render();
-    openSettingsTool("users");
-    showToast("Nova senha liberada. No proximo login, a senha digitada sera definida.");
     return;
   }
 
@@ -5052,6 +5709,18 @@ document.addEventListener("click", (event) => {
     return;
   }
 
+  const downloadInvoiceBookletButton = event.target.closest("[data-download-invoice-booklet]");
+  if (downloadInvoiceBookletButton) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!hasPermission("Faturas")) {
+      showToast("Seu usuario nao tem permissao para baixar carnes.");
+      return;
+    }
+    downloadInvoiceBookletPdf(downloadInvoiceBookletButton.dataset.downloadInvoiceBooklet);
+    return;
+  }
+
   const openContractDocument = event.target.closest("[data-open-contract-document]");
   if (openContractDocument) {
     renderContractDocumentViewer(openContractDocument.dataset.openContractDocument);
@@ -5099,6 +5768,18 @@ document.addEventListener("click", (event) => {
 
   if (event.target.matches("[data-cancel-edit]")) {
     renderProfile();
+    return;
+  }
+
+  const featuredToggle = event.target.closest("[data-featured-toggle]");
+  if (featuredToggle && state.activeProfile?.type === "property") {
+    if (!requireEntityEdit("property")) return;
+    const property = activeEntity();
+    property.featured = !property.featured;
+    saveAll();
+    render();
+    renderProfile();
+    showToast(property.featured ? "Imovel marcado como destaque da Home." : "Imovel removido dos destaques da Home.");
     return;
   }
 
@@ -5169,6 +5850,15 @@ document.addEventListener("click", (event) => {
 
   if (event.target.matches("[data-save-settings]")) {
     showToast("Configuracao salva.");
+    return;
+  }
+
+  if (event.target.matches("[data-download-backup]")) {
+    if (!isAdmin()) {
+      showToast("Somente administrador pode baixar backup.");
+      return;
+    }
+    downloadBackup();
     return;
   }
 
@@ -5523,30 +6213,14 @@ document.addEventListener("submit", async (event) => {
     }
     const contract = findContract(signContractForm.dataset.signContractForm);
     if (!contract || contract.signed) return;
-    const data = collectForm(signContractForm);
-    const count = Number(data.signatureCount || 0);
-    const signatures = Array.from({ length: count }, (_, index) => ({
-      role: data[`role_${index}`],
-      name: data[`name_${index}`],
-      key: data[`key_${index}`],
-      signature: data[`signature_${index}`],
-      signedAt: new Date().toISOString(),
-    }));
     const signedDocumentInput = signContractForm.querySelector('[name="signedDocument"]');
     const signedDocument = signedDocumentInput?.files?.length ? await readSignedContractDocument(signedDocumentInput) : null;
     if (signedDocumentInput?.files?.length && !signedDocument) return;
-    const hasSignedDocument = Boolean(signedDocument);
-    const hasAnyElectronicSignature = signatures.some((signature) => signature.signature);
-    const hasAllElectronicSignatures = signatures.every((signature) => signature.signature);
-    if (!hasSignedDocument && !hasAllElectronicSignatures) {
-      showToast("Preencha todas as assinaturas eletronicas ou anexe o contrato assinado.");
+    if (!signedDocument) {
+      showToast("Anexe o contrato assinado para finalizar.");
       return;
     }
-    if (hasAnyElectronicSignature && !hasAllElectronicSignatures) {
-      showToast("Complete todas as assinaturas eletronicas ou deixe os campos em branco e use o contrato anexado.");
-      return;
-    }
-    const confirmed = window.confirm("Tem certeza que deseja salvar as assinaturas? Depois disso o contrato nao podera ser modificado ou excluido.");
+    const confirmed = window.confirm("Tem certeza que deseja salvar o contrato assinado? Depois disso o contrato nao podera ser modificado ou excluido.");
     if (!confirmed) return;
     const previous = {
       signed: contract.signed,
@@ -5556,7 +6230,7 @@ document.addEventListener("submit", async (event) => {
     };
     contract.signed = true;
     contract.signedAt = new Date().toISOString();
-    contract.signatures = hasAllElectronicSignatures ? signatures : [];
+    contract.signatures = [];
     contract.signedDocument = signedDocument;
     if (!saveAll()) {
       Object.assign(contract, previous);
@@ -5669,6 +6343,10 @@ document.addEventListener("submit", async (event) => {
         title: data.compraTitle || "CONTRATO PARTICULAR DE COMPRA E VENDA DE IMOVEL",
         body: data.compraBody || defaultContractTemplates().compra.body,
       },
+      avulso: {
+        title: data.avulsoTitle || "CONTRATO AVULSO DE TEMPORADA",
+        body: data.avulsoBody || defaultContractTemplates().avulso.body,
+      },
     };
     saveAll();
     openSettingsTool("invoices");
@@ -5703,8 +6381,19 @@ document.addEventListener("submit", async (event) => {
     }
     const data = collectForm(whatsappForm);
     state.company.whatsapp = {
+      ...state.company.whatsapp,
       sender: data.sender || "",
       message: data.message || "",
+      cloudApiEnabled: data.cloudApiEnabled || "Nao",
+      phoneNumberId: data.phoneNumberId || "",
+      businessAccountId: data.businessAccountId || "",
+      appId: data.appId || "",
+      webhookVerifyToken: data.webhookVerifyToken || "",
+      webhookUrl: data.webhookUrl || "",
+      accessToken: data.accessToken || "",
+      testTo: data.testTo || "",
+      testMessage: data.testMessage || "",
+      connectionStatus: data.cloudApiEnabled === "Sim" && data.phoneNumberId && data.businessAccountId ? "Pronto para backend/API" : "Aguardando configuracao",
     };
     saveAll();
     openSettingsTool("whatsapp");
@@ -5872,6 +6561,10 @@ document.addEventListener("submit", async (event) => {
     delete data.cropX;
     delete data.cropY;
     data.photo = entity.photos?.[0] || entity.photo || null;
+  }
+
+  if (type === "property") {
+    data.price = data.netValue || data.grossValue || "";
   }
 
   Object.assign(entity, data);

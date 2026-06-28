@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Regis Imobiliaria</title>
-    <link rel="stylesheet" href="styles.css?v=20260608f" />
+    <link rel="stylesheet" href="styles.css?v=20260627c" />
   </head>
   <body class="public-mode">
     <section class="site-shell" id="site-publico" aria-label="Site publico da imobiliaria">
@@ -17,26 +17,30 @@
           </span>
         </a>
         <nav class="site-nav" aria-label="Navegacao do site">
-          <a href="#site-imoveis">Imoveis</a>
-          <a href="#site-contato">Contato</a>
+          <a href="#home" data-public-page-link="home">Home</a>
+          <a href="#imoveis" data-public-page-link="imoveis">Imoveis</a>
+          <a href="#contato" data-public-page-link="contato">Contato</a>
           <button class="site-login-button" type="button" data-open-login>Area do corretor</button>
         </nav>
       </header>
 
       <main>
+        <section class="site-page active" data-public-page="home">
         <section class="site-hero">
           <div class="site-hero-copy">
             <p class="eyebrow">Registro e regiao</p>
             <h1 data-public-hero-title>Regis Imobiliaria</h1>
-            <p>Imoveis disponiveis atualizados direto pelo sistema interno da imobiliaria.</p>
             <div class="site-hero-actions">
-              <a class="submit-button" href="#site-imoveis">Ver imoveis</a>
-              <a class="secondary-button" href="#site-contato">Falar com a equipe</a>
+              <a class="submit-button" href="#imoveis" data-public-page-link="imoveis">Ver imoveis</a>
+              <a class="secondary-button" href="#imoveis" data-public-page-link="imoveis">Explorar regioes</a>
+              <a class="secondary-button" href="#contato" data-public-page-link="contato">Falar com a equipe</a>
             </div>
           </div>
           <div class="site-hero-media" id="site-hero-media" aria-label="Imovel em destaque"></div>
         </section>
+        </section>
 
+        <section class="site-page" data-public-page="imoveis">
         <section class="site-search-band" aria-label="Filtros de busca">
           <label>
             Buscar
@@ -78,17 +82,37 @@
           </div>
           <div class="site-property-grid" id="site-property-list"></div>
         </section>
+        </section>
 
-        <section class="site-contact" id="site-contato">
-          <div>
-            <p class="eyebrow">Atendimento</p>
-            <h2>Encontrou um imovel interessante?</h2>
-            <p>Envie uma mensagem com o codigo ou nome do imovel para a equipe retornar com visita, proposta e detalhes da documentacao.</p>
-          </div>
-          <div class="site-contact-actions">
-            <a class="submit-button" href="#" data-public-whatsapp>Chamar no WhatsApp</a>
-            <a class="secondary-button" href="mailto:" data-public-email>Enviar email</a>
-          </div>
+        <section class="site-page" data-public-page="contato">
+          <section class="site-contact-page" id="site-contato">
+            <div class="site-section-head">
+              <div>
+                <p class="eyebrow">Contato</p>
+                <h2>Sobre a empresa e equipe</h2>
+              </div>
+              <span class="site-count">Atendimento imobiliario</span>
+            </div>
+            <div class="site-contact-layout">
+              <article class="site-about-card">
+                <p class="eyebrow">Empresa</p>
+                <h3 data-public-company-name>Regis Imobiliaria</h3>
+                <p>Atendimento imobiliario para compra, locacao, captacao de imoveis, contratos e acompanhamento comercial em Registro e regiao.</p>
+                <div class="site-contact-actions">
+                  <a class="submit-button" href="#" data-public-whatsapp>Chamar no WhatsApp</a>
+                  <a class="secondary-button" href="mailto:" data-public-email>Enviar email</a>
+                </div>
+              </article>
+              <article class="site-contact-card">
+                <p class="eyebrow">Meios de contato</p>
+                <div id="site-contact-info"></div>
+              </article>
+              <article class="site-realtors-card">
+                <p class="eyebrow">Corretores</p>
+                <div id="site-realtor-list"></div>
+              </article>
+            </div>
+          </section>
         </section>
       </main>
     </section>
@@ -123,13 +147,13 @@
           <span aria-hidden="true">▤</span>
           <span>Contratos</span>
         </a>
-        <a class="nav-link" href="#agendamentos" data-view-link="agendamentos">
-          <span aria-hidden="true">AG</span>
-          <span>Agendamentos</span>
-        </a>
         <a class="nav-link" href="#faturas" data-view-link="faturas">
           <span aria-hidden="true">R$</span>
           <span>Faturas</span>
+        </a>
+        <a class="nav-link" href="#agendamentos" data-view-link="agendamentos">
+          <span aria-hidden="true">AG</span>
+          <span>Agendamento</span>
         </a>
         <a class="nav-link" href="#configuracao" data-view-link="configuracao">
           <span aria-hidden="true">⚙</span>
@@ -216,8 +240,12 @@
                 </select>
               </label>
               <label>
-                Valor
-                <input name="price" type="number" min="0" step="1000" placeholder="350000" required />
+                Valor bruto
+                <input name="grossValue" type="number" min="0" step="1000" placeholder="Valor pedido pelo proprietario" required />
+              </label>
+              <label>
+                Valor liquido
+                <input name="netValue" type="number" min="0" step="1000" placeholder="Valor final para anuncio/contrato" required />
               </label>
               <label class="full">
                 Localizacao Google Maps
@@ -433,7 +461,25 @@
             <p class="eyebrow">Carteira</p>
             <h2>Imoveis cadastrados</h2>
           </div>
-          <input class="search-input" type="search" placeholder="Filtrar imoveis" data-filter="properties" />
+        </div>
+        <div class="list-filters" aria-label="Filtros de imoveis">
+          <input class="search-input" type="search" placeholder="Buscar por titulo, proprietario ou endereco" data-filter="properties" />
+          <select data-filter="propertyPurpose" aria-label="Filtrar por finalidade">
+            <option value="all">Todas as finalidades</option>
+            <option value="Venda">Venda</option>
+            <option value="Locacao">Locacao</option>
+          </select>
+          <select data-filter="propertyAvailability" aria-label="Filtrar por disponibilidade">
+            <option value="all">Todos os status</option>
+            <option value="available">Disponiveis</option>
+            <option value="unavailable">Indisponiveis</option>
+          </select>
+          <select data-filter="propertyType" aria-label="Filtrar por tipo de imovel">
+            <option value="all">Todos os tipos</option>
+          </select>
+          <select data-filter="propertyCity" aria-label="Filtrar por cidade">
+            <option value="all">Todas as cidades</option>
+          </select>
         </div>
         <div class="cards-grid" id="property-list"></div>
       </section>
@@ -444,7 +490,22 @@
             <p class="eyebrow">Relacionamento</p>
             <h2>Clientes cadastrados</h2>
           </div>
-          <input class="search-input" type="search" placeholder="Filtrar clientes" data-filter="clients" />
+        </div>
+        <div class="list-filters" aria-label="Filtros de clientes">
+          <input class="search-input" type="search" placeholder="Buscar por nome, CPF, contato ou endereco" data-filter="clients" />
+          <select data-filter="clientContract" aria-label="Filtrar por contratos">
+            <option value="all">Todos os clientes</option>
+            <option value="with">Com contrato</option>
+            <option value="without">Sem contrato</option>
+          </select>
+          <select data-filter="clientDocument" aria-label="Filtrar por documentos">
+            <option value="all">Todos os documentos</option>
+            <option value="with">Com documentos</option>
+            <option value="without">Sem documentos</option>
+          </select>
+          <select data-filter="clientCity" aria-label="Filtrar por cidade">
+            <option value="all">Todas as cidades</option>
+          </select>
         </div>
         <div class="cards-grid clients" id="client-list"></div>
       </section>
@@ -455,7 +516,22 @@
             <p class="eyebrow">Carteira</p>
             <h2>Proprietarios cadastrados</h2>
           </div>
-          <input class="search-input" type="search" placeholder="Filtrar proprietarios" data-filter="owners" />
+        </div>
+        <div class="list-filters" aria-label="Filtros de proprietarios">
+          <input class="search-input" type="search" placeholder="Buscar por nome, CPF, contato ou endereco" data-filter="owners" />
+          <select data-filter="ownerProperty" aria-label="Filtrar por imoveis">
+            <option value="all">Todos os proprietarios</option>
+            <option value="with">Com imovel</option>
+            <option value="without">Sem imovel</option>
+          </select>
+          <select data-filter="ownerDocument" aria-label="Filtrar por documentos">
+            <option value="all">Todos os documentos</option>
+            <option value="with">Com documentos</option>
+            <option value="without">Sem documentos</option>
+          </select>
+          <select data-filter="ownerCity" aria-label="Filtrar por cidade">
+            <option value="all">Todas as cidades</option>
+          </select>
         </div>
         <div class="cards-grid clients" id="owner-list"></div>
       </section>
@@ -464,7 +540,7 @@
         <div class="list-header">
           <div>
             <p class="eyebrow">Financeiro</p>
-            <h2>Contratos de venda e locacao</h2>
+            <h2>Contratos de locacao, venda e avulso</h2>
           </div>
         </div>
         <section class="panel">
@@ -472,6 +548,7 @@
             <div class="segmented-control contract-tabs full" role="tablist" aria-label="Tipo de contrato">
               <button class="segment active" type="button" data-contract-tab="Locacao">Locacao</button>
               <button class="segment" type="button" data-contract-tab="Compra">Venda</button>
+              <button class="segment" type="button" data-contract-tab="Avulso">Avulso</button>
             </div>
             <input name="type" type="hidden" value="Locacao" />
             <label>
@@ -549,6 +626,28 @@
                 <input name="negotiatedValue" type="number" min="0" step="1000" placeholder="420000" />
               </label>
             </section>
+            <section class="contract-type-panel full" data-contract-field="avulso" hidden>
+              <div class="section-title">
+                <p class="eyebrow">Temporada</p>
+                <h3>Contrato avulso por temporada</h3>
+              </div>
+              <label>
+                Valor do contrato
+                <input name="oneOffValue" type="number" min="0" step="10" placeholder="Valor liquido do periodo" />
+              </label>
+              <label>
+                Data de entrada
+                <input name="seasonStart" type="date" />
+              </label>
+              <label>
+                Data de saida
+                <input name="seasonEnd" type="date" />
+              </label>
+              <label>
+                Categoria
+                <input name="seasonCategory" value="Temporada" placeholder="Temporada, diaria, evento" />
+              </label>
+            </section>
             <label class="full">
               Observacao
               <textarea name="notes" rows="3" placeholder="Clausulas principais, combinados e condicoes"></textarea>
@@ -565,8 +664,9 @@
           </div>
           <div class="segmented-control contract-filter-tabs" role="tablist" aria-label="Filtro por tipo">
             <button class="segment active" type="button" data-contract-type-filter="all">Todos</button>
-            <button class="segment" type="button" data-contract-type-filter="Compra">Venda</button>
             <button class="segment" type="button" data-contract-type-filter="Locacao">Locacao</button>
+            <button class="segment" type="button" data-contract-type-filter="Compra">Venda</button>
+            <button class="segment" type="button" data-contract-type-filter="Avulso">Avulso</button>
           </div>
           <div class="segmented-control contract-filter-tabs status-tabs" role="tablist" aria-label="Filtro por status">
             <button class="segment active" type="button" data-contract-status-filter="all">Ativos</button>
@@ -769,11 +869,6 @@
             <strong>Usuarios</strong>
             <small>Equipe e permissoes</small>
           </button>
-          <button class="settings-tool" type="button" data-settings-tool="password">
-            <span>SN</span>
-            <strong>Minha senha</strong>
-            <small>Alterar senha do usuario logado</small>
-          </button>
           <button class="settings-tool" type="button" data-settings-tool="whatsapp">
             <span>WA</span>
             <strong>WhatsApp</strong>
@@ -783,11 +878,6 @@
             <span>NT</span>
             <strong>Notificacoes</strong>
             <small>Lembretes e alertas</small>
-          </button>
-          <button class="settings-tool" type="button" data-settings-tool="security">
-            <span>SG</span>
-            <strong>Seguranca</strong>
-            <small>Acesso e privacidade</small>
           </button>
           <button class="settings-tool" type="button" data-settings-tool="backup">
             <span>BK</span>
@@ -804,21 +894,6 @@
             <strong>Relatorios</strong>
             <small>Indicadores e desempenho</small>
           </button>
-          <button class="settings-tool" type="button" data-settings-tool="cities">
-            <span>CD</span>
-            <strong>Cidades</strong>
-            <small>Bairros e regioes atendidas</small>
-          </button>
-          <button class="settings-tool" type="button" data-settings-tool="integrations">
-            <span>IN</span>
-            <strong>Integracoes</strong>
-            <small>Portais, API e automacoes</small>
-          </button>
-          <button class="settings-tool" type="button" data-settings-tool="templates">
-            <span>MD</span>
-            <strong>Modelos</strong>
-            <small>Contratos e mensagens</small>
-          </button>
           <button class="settings-tool" type="button" data-settings-tool="help">
             <span>?</span>
             <strong>Ajuda</strong>
@@ -829,6 +904,18 @@
     </main>
 
     <div class="toast" role="status" aria-live="polite" id="toast"></div>
+    <div class="modal-backdrop" id="public-property-modal" hidden>
+      <section class="public-property-modal" role="dialog" aria-modal="true" aria-labelledby="public-property-title">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Imovel</p>
+            <h2 id="public-property-title">Detalhes do imovel</h2>
+          </div>
+          <button class="icon-button" type="button" data-close-public-property aria-label="Fechar">x</button>
+        </div>
+        <div id="public-property-content"></div>
+      </section>
+    </div>
     <div class="modal-backdrop" id="login-modal" hidden>
       <section class="login-modal" role="dialog" aria-modal="true" aria-labelledby="login-title">
         <div class="modal-header">
@@ -843,11 +930,6 @@
           <label>Senha<input name="password" type="password" placeholder="Senha de acesso" required /></label>
           <button class="submit-button" type="submit">Entrar no sistema</button>
           <p>Login inicial: admin@regisimobiliaria.com / regis6210</p>
-        </form>
-        <form class="login-form reset-form" id="password-reset-request-form">
-          <label>Recuperar senha<input name="email" type="email" placeholder="Digite seu email de usuario" required /></label>
-          <button class="secondary-button" type="submit">Solicitar nova senha</button>
-          <p>O administrador libera a redefinicao em Configuracoes > Usuarios.</p>
         </form>
       </section>
     </div>
@@ -864,6 +946,6 @@
       </section>
     </div>
     <script src="assets/jspdf.browser.js?v=20260604a"></script>
-    <script src="script.js?v=20260608f"></script>
+    <script src="script.js?v=20260627c"></script>
   </body>
 </html>
