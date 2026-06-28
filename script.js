@@ -450,6 +450,10 @@ const state = {
   carouselIndex: 0,
   publicHeroIndex: 0,
   publicHeroTimer: null,
+  cloudSyncReady: false,
+  cloudSyncInFlight: false,
+  cloudSaveTimer: null,
+  cloudSyncStatus: "Inicializando banco em nuvem",
   authenticated: localStorage.getItem(authKey) === "true",
   currentUserId: localStorage.getItem(currentUserKey) || "",
   filters: {
@@ -708,6 +712,18 @@ function saveCollection(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
+function persistLocalState() {
+  saveCollection(propertyKey, state.properties);
+  saveCollection(clientKey, state.clients);
+  saveCollection(ownerKey, state.owners);
+  saveCollection(contractKey, state.contracts);
+  saveCollection(teamKey, state.team);
+  saveCollection(appointmentKey, state.appointments);
+  saveCollection(invoiceKey, state.invoices);
+  saveCollection(trashKey, state.trash);
+  saveCollection(companyKey, state.company);
+}
+
 function openLocalDatabase() {
   return new Promise((resolve, reject) => {
     if (!("indexedDB" in window)) {
@@ -749,21 +765,86 @@ async function mirrorToLocalDatabase() {
 
 function saveAll() {
   try {
-    saveCollection(propertyKey, state.properties);
-    saveCollection(clientKey, state.clients);
-    saveCollection(ownerKey, state.owners);
-    saveCollection(contractKey, state.contracts);
-    saveCollection(teamKey, state.team);
-    saveCollection(appointmentKey, state.appointments);
-    saveCollection(invoiceKey, state.invoices);
-    saveCollection(trashKey, state.trash);
-    saveCollection(companyKey, state.company);
+    persistLocalState();
     mirrorToLocalDatabase();
+    scheduleCloudSave();
     return true;
   } catch (error) {
     showToast("Armazenamento cheio. Use fotos menores ou remova arquivos grandes.");
     console.error(error);
     return false;
+  }
+}
+
+function cloudPayload() {
+  return {
+    properties: state.properties,
+    clients: state.clients,
+    owners: state.owners,
+    contracts: state.contracts,
+    team: state.team,
+    appointments: state.appointments,
+    invoices: state.invoices,
+    trash: state.trash,
+    company: state.company,
+  };
+}
+
+function applyCloudState(data = {}) {
+  if (Array.isArray(data.properties)) state.properties = ensureProperties(data.properties);
+  if (Array.isArray(data.clients)) state.clients = ensureClients(data.clients);
+  if (Array.isArray(data.owners)) state.owners = ensureOwners(data.owners);
+  if (Array.isArray(data.contracts)) state.contracts = ensureContracts(data.contracts);
+  if (Array.isArray(data.team)) state.team = ensureTeam(data.team);
+  if (Array.isArray(data.appointments)) state.appointments = ensureAppointments(data.appointments);
+  if (Array.isArray(data.invoices)) state.invoices = ensureInvoices(data.invoices);
+  if (Array.isArray(data.trash)) state.trash = ensureTrash(data.trash);
+  if (data.company) state.company = ensureCompany(data.company);
+}
+
+function scheduleCloudSave(delay = 900) {
+  if (!state.cloudSyncReady) return;
+  window.clearTimeout(state.cloudSaveTimer);
+  state.cloudSaveTimer = window.setTimeout(syncCloudState, delay);
+}
+
+async function syncCloudState() {
+  if (!state.cloudSyncReady || state.cloudSyncInFlight) return;
+  state.cloudSyncInFlight = true;
+  try {
+    const response = await fetch("/api/state", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(cloudPayload()),
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    state.cloudSyncStatus = "Sincronizado com banco em nuvem";
+  } catch (error) {
+    console.warn("Sincronizacao em nuvem falhou", error);
+    state.cloudSyncStatus = "Falha ao sincronizar banco em nuvem";
+  } finally {
+    state.cloudSyncInFlight = false;
+  }
+}
+
+async function initCloudSync() {
+  try {
+    const response = await fetch("/api/state", { cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    if (!payload.empty) {
+      applyCloudState(payload.data);
+      persistLocalState();
+      mirrorToLocalDatabase();
+      render();
+      state.cloudSyncStatus = "Dados carregados do banco em nuvem";
+    }
+    state.cloudSyncReady = true;
+    if (payload.empty) scheduleCloudSave(50);
+  } catch (error) {
+    console.warn("Banco em nuvem indisponivel", error);
+    state.cloudSyncReady = false;
+    state.cloudSyncStatus = "Usando armazenamento local";
   }
 }
 
@@ -6581,3 +6662,4 @@ document.addEventListener("keydown", (event) => {
 });
 
 render();
+initCloudSync();

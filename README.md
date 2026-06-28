@@ -81,3 +81,13 @@ Para colocar em dominio real, sera necessario:
 - GitHub conectado;
 - backup;
 - backend para banco, storage, Google Maps e WhatsApp quando sair do modo local.
+
+## Banco em nuvem
+
+O deploy atual no Cloud Run possui API para sincronizar os dados com Firestore:
+
+- `GET /api/state`
+- `POST /api/state`
+- `GET /api/health`
+
+O app ainda mantem uma copia local no navegador para abertura rapida, mas depois de carregar a nuvem passa a salvar as alteracoes no Firestore.

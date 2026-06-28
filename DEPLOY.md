@@ -94,6 +94,38 @@ gcloud run deploy regis-imobiliaria --image southamerica-east1-docker.pkg.dev/SE
 
 Cloud Run deixa o sistema online, mas os dados do sistema ainda continuam no navegador enquanto o app estiver usando armazenamento local/IndexedDB. Para operacao com varios usuarios compartilhando os mesmos dados, o proximo passo e conectar um backend e banco em nuvem.
 
+## Banco de dados em nuvem
+
+O Cloud Run tambem pode servir a API do sistema:
+
+- `GET /api/health`: verifica se o backend esta ativo.
+- `GET /api/state`: carrega dados do Firestore.
+- `POST /api/state`: salva dados no Firestore.
+
+O banco usado e o Firestore em modo nativo.
+
+Colecoes sincronizadas:
+
+- `properties`
+- `clients`
+- `owners`
+- `contracts`
+- `team`
+- `appointments`
+- `invoices`
+- `trash`
+- `company`
+
+Comandos usados para preparar o banco:
+
+```powershell
+gcloud services enable firestore.googleapis.com --project imobiliariasystem-500804
+gcloud firestore databases create --database="(default)" --location=southamerica-east1 --type=firestore-native --project imobiliariasystem-500804
+gcloud projects add-iam-policy-binding imobiliariasystem-500804 --member="serviceAccount:392338037538-compute@developer.gserviceaccount.com" --role="roles/datastore.user"
+```
+
+Observacao: os dados antigos que estavam em `127.0.0.1` continuam no armazenamento local daquela origem. Para levar esses dados para a nuvem, exporte/importar backup ou abra uma rotina de migracao a partir do navegador que possui os dados locais.
+
 ## Servidor VPS com Nginx
 
 Exemplo de pasta no servidor:
