@@ -4,7 +4,7 @@ const path = require("path");
 
 const root = process.cwd();
 const port = Number(process.env.PORT || 4173);
-const host = "127.0.0.1";
+const host = process.env.HOST || "0.0.0.0";
 const types = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -22,8 +22,9 @@ http
     const requestUrl = new URL(request.url, `http://${host}:${port}`);
     const pathname = requestUrl.pathname === "/" ? "/index.html" : requestUrl.pathname;
     const file = path.resolve(root, `.${decodeURIComponent(pathname)}`);
+    const relativePath = path.relative(root, file);
 
-    if (!file.startsWith(root)) {
+    if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
       response.writeHead(403);
       response.end("Forbidden");
       return;
@@ -41,4 +42,6 @@ http
       response.end(data);
     });
   })
-  .listen(port, host);
+  .listen(port, host, () => {
+    console.log(`Regis Imobiliaria online em http://${host}:${port}`);
+  });

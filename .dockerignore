@@ -1,0 +1,12 @@
+.git
+.agents
+node_modules
+npm-debug.log
+*.log
+tmp
+temp
+backups
+*.backup.json
+.env
+.env.*
+!.env.example

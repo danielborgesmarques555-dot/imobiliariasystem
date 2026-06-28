@@ -1,0 +1,13 @@
+{
+  "name": "regis-imobiliaria",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sistema imobiliario com vitrine publica e gestao interna.",
+  "scripts": {
+    "start": "node dev-server.cjs",
+    "check": "node --check script.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -39,6 +39,61 @@ URL local:
 http://127.0.0.1:5173/
 ```
 
+## Google Cloud Run
+
+O projeto tambem esta preparado para Cloud Run usando Node.js.
+
+Arquivos usados:
+
+- `package.json`: define `npm start`.
+- `dev-server.cjs`: servidor HTTP que respeita a porta `PORT` do Cloud Run.
+- `Dockerfile`: imagem simples para publicar o site.
+- `.dockerignore`: evita enviar arquivos locais, backups e segredos.
+
+### 1. Instalar e autenticar Google Cloud CLI
+
+Instale a CLI:
+
+```txt
+https://cloud.google.com/sdk/docs/install
+```
+
+Depois autentique:
+
+```powershell
+gcloud auth login
+gcloud config set project SEU_PROJECT_ID
+```
+
+### 2. Habilitar APIs
+
+```powershell
+gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com
+```
+
+### 3. Deploy direto do codigo
+
+Execute na pasta do projeto:
+
+```powershell
+gcloud run deploy regis-imobiliaria --source . --region southamerica-east1 --allow-unauthenticated
+```
+
+Ao final, o Cloud Run mostrara uma URL HTTPS publica.
+
+### 4. Deploy usando Dockerfile
+
+Alternativa com build por container:
+
+```powershell
+gcloud builds submit --tag southamerica-east1-docker.pkg.dev/SEU_PROJECT_ID/regis/regis-imobiliaria
+gcloud run deploy regis-imobiliaria --image southamerica-east1-docker.pkg.dev/SEU_PROJECT_ID/regis/regis-imobiliaria --region southamerica-east1 --allow-unauthenticated
+```
+
+### Observacao importante
+
+Cloud Run deixa o sistema online, mas os dados do sistema ainda continuam no navegador enquanto o app estiver usando armazenamento local/IndexedDB. Para operacao com varios usuarios compartilhando os mesmos dados, o proximo passo e conectar um backend e banco em nuvem.
+
 ## Servidor VPS com Nginx
 
 Exemplo de pasta no servidor:
