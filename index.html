@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Regis Imobiliaria</title>
-    <link rel="stylesheet" href="styles.css?v=20260627c" />
+    <link rel="stylesheet" href="styles.css?v=20260629e" />
   </head>
   <body class="public-mode">
     <section class="site-shell" id="site-publico" aria-label="Site publico da imobiliaria">
@@ -19,6 +19,7 @@
         <nav class="site-nav" aria-label="Navegacao do site">
           <a href="#home" data-public-page-link="home">Home</a>
           <a href="#imoveis" data-public-page-link="imoveis">Imoveis</a>
+          <a href="#regiao" data-public-page-link="regiao">Regiao</a>
           <a href="#contato" data-public-page-link="contato">Contato</a>
           <button class="site-login-button" type="button" data-open-login>Area do corretor</button>
         </nav>
@@ -28,16 +29,17 @@
         <section class="site-page active" data-public-page="home">
         <section class="site-hero">
           <div class="site-hero-copy">
-            <p class="eyebrow">Registro e regiao</p>
+            <p class="eyebrow" data-public-hero-eyebrow>Registro e regiao</p>
             <h1 data-public-hero-title>Regis Imobiliaria</h1>
             <div class="site-hero-actions">
               <a class="submit-button" href="#imoveis" data-public-page-link="imoveis">Ver imoveis</a>
-              <a class="secondary-button" href="#imoveis" data-public-page-link="imoveis">Explorar regioes</a>
+              <a class="secondary-button" href="#regiao" data-public-page-link="regiao">Explorar regiao</a>
               <a class="secondary-button" href="#contato" data-public-page-link="contato">Falar com a equipe</a>
             </div>
           </div>
           <div class="site-hero-media" id="site-hero-media" aria-label="Imovel em destaque"></div>
         </section>
+        <section class="site-editor-content" id="site-editor-content"></section>
         </section>
 
         <section class="site-page" data-public-page="imoveis">
@@ -84,6 +86,49 @@
         </section>
         </section>
 
+        <section class="site-page" data-public-page="regiao">
+          <section class="site-region-page">
+            <div class="site-region-hero">
+              <p class="eyebrow">Regiao</p>
+              <h2>Registro e Vale do Ribeira com olhar imobiliario</h2>
+              <p>Uma apresentacao executiva da regiao para quem busca morar, investir, comprar, alugar ou entender o potencial urbano, comercial e turistico local.</p>
+            </div>
+            <div class="site-region-grid">
+              <article>
+                <span>01</span>
+                <h3>Localizacao estrategica</h3>
+                <p>Registro conecta bairros residenciais, areas comerciais, rotas regionais e acessos importantes para cidades vizinhas, formando uma base forte para moradia e investimento.</p>
+              </article>
+              <article>
+                <span>02</span>
+                <h3>Potencial de crescimento</h3>
+                <p>A regiao combina loteamentos, areas urbanas consolidadas, terrenos, chacaras e imoveis comerciais com oportunidades para diferentes perfis de comprador.</p>
+              </article>
+              <article>
+                <span>03</span>
+                <h3>Natureza e turismo</h3>
+                <p>O Vale do Ribeira se destaca por rios, cavernas, Mata Atlantica, parques, areas rurais e roteiros de ecoturismo que valorizam o estilo de vida regional.</p>
+              </article>
+            </div>
+            <section class="site-region-points">
+              <div>
+                <p class="eyebrow">Pontos de interesse</p>
+                <h3>O que observar antes de escolher um imovel</h3>
+              </div>
+              <div class="site-region-list">
+                <p><strong>Centro e bairros consolidados:</strong> praticidade, comercio, escolas, servicos e liquidez.</p>
+                <p><strong>Loteamentos e expansao urbana:</strong> perfil de crescimento, infraestrutura e valorizacao futura.</p>
+                <p><strong>Areas rurais e lazer:</strong> espaco, natureza, acesso, documentacao e vocacao para temporada.</p>
+                <p><strong>Rotas turisticas:</strong> proximidade com rios, parques, trilhas, cavernas e atrativos naturais.</p>
+              </div>
+            </section>
+            <div class="site-region-actions">
+              <a class="submit-button" href="#imoveis" data-public-page-link="imoveis">Ver imoveis da regiao</a>
+              <a class="secondary-button" href="#contato" data-public-page-link="contato">Falar com um corretor</a>
+            </div>
+          </section>
+        </section>
+
         <section class="site-page" data-public-page="contato">
           <section class="site-contact-page" id="site-contato">
             <div class="site-section-head">
@@ -97,7 +142,7 @@
               <article class="site-about-card">
                 <p class="eyebrow">Empresa</p>
                 <h3 data-public-company-name>Regis Imobiliaria</h3>
-                <p>Atendimento imobiliario para compra, locacao, captacao de imoveis, contratos e acompanhamento comercial em Registro e regiao.</p>
+                <p data-public-about-text>Atendimento imobiliario para compra, locacao, captacao de imoveis, contratos e acompanhamento comercial em Registro e regiao.</p>
                 <div class="site-contact-actions">
                   <a class="submit-button" href="#" data-public-whatsapp>Chamar no WhatsApp</a>
                   <a class="secondary-button" href="mailto:" data-public-email>Enviar email</a>
@@ -154,6 +199,10 @@
         <a class="nav-link" href="#agendamentos" data-view-link="agendamentos">
           <span aria-hidden="true">AG</span>
           <span>Agendamento</span>
+        </a>
+        <a class="nav-link" href="#vitrine" data-view-link="vitrine">
+          <span aria-hidden="true">VT</span>
+          <span>Vitrine</span>
         </a>
         <a class="nav-link" href="#configuracao" data-view-link="configuracao">
           <span aria-hidden="true">⚙</span>
@@ -247,22 +296,31 @@
                 Valor liquido
                 <input name="netValue" type="number" min="0" step="1000" placeholder="Valor final para anuncio/contrato" required />
               </label>
-              <label class="full">
-                Localizacao Google Maps
-                <input name="googleLocation" type="text" placeholder="Cole o link do Google Maps ou digite o endereco completo" required />
-              </label>
-              <section class="geo-grid full">
-                <div class="section-title">
-                  <p class="eyebrow">Georreferencia</p>
-                  <h3>Dados para Maps, site e cidades de atuacao</h3>
+              <section class="property-map-picker full">
+                <div class="map-search-panel">
+                  <label>
+                    Localizacao do imovel
+                    <input name="googleLocation" type="text" placeholder="Pesquise o endereco ou cole o link do Google Maps" data-address-input required />
+                  </label>
+                  <div class="geo-actions">
+                    <button class="secondary-button" type="button" data-geocode-property>Buscar</button>
+                    <button class="secondary-button" type="button" data-open-property-map>Abrir mapa</button>
+                  </div>
                 </div>
-                <label>Latitude<input name="latitude" type="number" step="0.000001" placeholder="-24.4973" /></label>
-                <label>Longitude<input name="longitude" type="number" step="0.000001" placeholder="-47.8448" /></label>
-                <label>Cidade detectada<input name="city" type="text" placeholder="Registro" /></label>
-                <label>Bairro/regiao<input name="district" type="text" placeholder="Centro" /></label>
-                <label class="full">Endereco formatado<input name="formattedAddress" type="text" placeholder="Endereco validado pelo Google Maps" /></label>
-                <label class="full">Link do Google Maps<input name="googleMapsUrl" type="url" placeholder="https://maps.google.com/..." /></label>
-                <input name="googlePlaceId" type="hidden" />
+                <div class="map-canvas" data-property-map-picker>
+                  <iframe title="Mapa do imovel" loading="lazy" referrerpolicy="no-referrer-when-downgrade" data-map-preview></iframe>
+                  <div class="map-empty-hint">Pesquise um endereco para posicionar o imovel no mapa.</div>
+                </div>
+                <div class="map-selected-address" data-map-selected-address>Nenhum endereco selecionado.</div>
+                <div class="map-hidden-fields">
+                  <input name="latitude" type="hidden" />
+                  <input name="longitude" type="hidden" />
+                  <input name="city" type="hidden" />
+                  <input name="district" type="hidden" />
+                  <input name="formattedAddress" type="hidden" />
+                  <input name="googleMapsUrl" type="hidden" />
+                  <input name="googlePlaceId" type="hidden" />
+                </div>
               </section>
               <label>
                 Quartos
@@ -282,6 +340,13 @@
               <label>
                 Piscina?
                 <select name="pool" required>
+                  <option value="Nao">Nao</option>
+                  <option value="Sim">Sim</option>
+                </select>
+              </label>
+              <label>
+                Aceita pet?
+                <select name="acceptsPet" required>
                   <option value="Nao">Nao</option>
                   <option value="Sim">Sim</option>
                 </select>
@@ -846,6 +911,18 @@
         </div>
       </section>
 
+      <section class="view" id="vitrine" data-view="vitrine" aria-label="Vitrine">
+        <div class="vitrine-topbar">
+          <button class="icon-button vitrine-back" type="button" data-vitrine-back aria-label="Voltar">‹</button>
+          <div>
+            <p class="eyebrow">Site publico</p>
+            <h2>Editor da Vitrine</h2>
+          </div>
+      <a class="secondary-button" href="https://espacosystem-ajj2masxxq-ew.a.run.app" target="_blank" rel="noopener">Ver site</a>
+        </div>
+        <section class="vitrine-editor" id="vitrine-editor"></section>
+      </section>
+
       <section class="view" id="configuracao" data-view="configuracao" aria-label="Configuracao">
         <div class="list-header">
           <div>
@@ -873,6 +950,11 @@
             <span>WA</span>
             <strong>WhatsApp</strong>
             <small>Mensagens e integracao</small>
+          </button>
+          <button class="settings-tool" type="button" data-settings-tool="integrations">
+            <span>IN</span>
+            <strong>Integracoes</strong>
+            <small>Maps, nuvem e Serasa/SPC</small>
           </button>
           <button class="settings-tool" type="button" data-settings-tool="notifications">
             <span>NT</span>
@@ -916,6 +998,13 @@
         <div id="public-property-content"></div>
       </section>
     </div>
+    <div class="modal-backdrop photo-lightbox" id="public-photo-lightbox" hidden>
+      <section class="public-photo-viewer" role="dialog" aria-modal="true" aria-label="Foto ampliada do imovel">
+        <button class="icon-button" type="button" data-close-public-photo aria-label="Fechar">x</button>
+        <img id="public-photo-lightbox-image" alt="Foto ampliada do imovel" />
+        <p id="public-photo-lightbox-caption"></p>
+      </section>
+    </div>
     <div class="modal-backdrop" id="login-modal" hidden>
       <section class="login-modal" role="dialog" aria-modal="true" aria-labelledby="login-title">
         <div class="modal-header">
@@ -946,6 +1035,6 @@
       </section>
     </div>
     <script src="assets/jspdf.browser.js?v=20260604a"></script>
-    <script src="script.js?v=20260627c"></script>
+    <script src="script.js?v=20260629e"></script>
   </body>
 </html>

@@ -278,6 +278,7 @@ const defaultProperties = [
     area: 145,
     leisureArea: "Sim",
     pool: "Nao",
+    acceptsPet: "Sim",
     garage: "Sim",
     garageSpaces: 2,
     notes: "Garagem coberta, quintal e documentacao encaminhada.",
@@ -299,6 +300,7 @@ const defaultProperties = [
     area: 72,
     leisureArea: "Nao",
     pool: "Nao",
+    acceptsPet: "Nao",
     garage: "Sim",
     garageSpaces: 1,
     notes: "Condominio com boa localizacao e visita facil de agendar.",
@@ -359,6 +361,26 @@ function ensureCompany(company = {}) {
     theme: "regis",
     colors: { ...themePresets.regis },
     publicHighlights: "",
+    site: {
+      model: "executivo",
+      layout: "imersivo",
+      heroEyebrow: "Registro e regiao",
+      heroTitle: company.name || "Regis Imobiliaria",
+      aboutText: "Atendimento imobiliario para compra, locacao, captacao de imoveis, contratos e acompanhamento comercial em Registro e regiao.",
+      featuredText: "Imoveis escolhidos pela equipe para compra, locacao e temporada.",
+      searchPlaceholder: "Cidade, bairro, tipo ou codigo",
+      blockOrder: ["hero", "busca", "destaques", "midia", "textos", "contato"],
+      blockVisibility: {
+        hero: true,
+        busca: true,
+        destaques: true,
+        midia: true,
+        textos: true,
+        contato: true,
+      },
+      media: [],
+      textBlocks: [],
+    },
     contractTemplates: defaultContractTemplates(),
     whatsapp: {
       sender: "",
@@ -392,17 +414,23 @@ function ensureCompany(company = {}) {
         mapVisibility: "Aproximada",
         status: "Aguardando chave Google Maps",
       },
+      creditBureau: {
+        endpoint: "",
+        status: "Aguardando integracao oficial Serasa/SPC",
+      },
     },
   };
   return {
     ...defaults,
     ...company,
     colors: { ...defaults.colors, ...(company.colors || {}) },
+    site: { ...defaults.site, ...(company.site || {}) },
     whatsapp: { ...defaults.whatsapp, ...(company.whatsapp || {}) },
     integrations: {
       database: { ...defaults.integrations.database, ...(company.integrations?.database || {}) },
       cloud: { ...defaults.integrations.cloud, ...(company.integrations?.cloud || {}) },
       googleMaps: { ...defaults.integrations.googleMaps, ...(company.integrations?.googleMaps || {}) },
+      creditBureau: { ...defaults.integrations.creditBureau, ...(company.integrations?.creditBureau || {}) },
     },
     contractTemplates: {
       locacao: { ...defaults.contractTemplates.locacao, ...(company.contractTemplates?.locacao || {}) },
@@ -450,6 +478,10 @@ const state = {
   carouselIndex: 0,
   publicHeroIndex: 0,
   publicHeroTimer: null,
+  publicDetailPhotoIndex: 0,
+  lastInternalView: "painel",
+  vitrineActiveBlock: "hero",
+  vitrineDevice: "desktop",
   cloudSyncReady: false,
   cloudSyncInFlight: false,
   cloudSaveTimer: null,
@@ -533,6 +565,7 @@ function ensureProperties(items) {
     price: item.netValue || item.finalPrice || item.price || item.grossValue || "",
     leisureArea: item.leisureArea || "Nao",
     pool: item.pool || "Nao",
+    acceptsPet: item.acceptsPet || "Nao",
     garage: item.garage || "Nao",
     garageSpaces: item.garageSpaces || "",
     photos: Array.isArray(item.photos) ? item.photos.map((file, index) => ensureFile(file, index === 0 ? "Principal" : `Foto ${index + 1}`)) : [],
@@ -560,6 +593,17 @@ function ensureClients(items) {
         : [],
     crop: item.crop || { zoom: 1, x: 50, y: 50 },
     documents: Array.isArray(item.documents) ? item.documents.map((file) => ensureFile(file)) : [],
+    creditCheck: {
+      authorized: Boolean(item.creditCheck?.authorized),
+      authorizedAt: item.creditCheck?.authorizedAt || "",
+      lastCheckedAt: item.creditCheck?.lastCheckedAt || "",
+      status: item.creditCheck?.status || "Nao consultado",
+      score: item.creditCheck?.score || "",
+      nameStatus: item.creditCheck?.nameStatus || "",
+      debts: Array.isArray(item.creditCheck?.debts) ? item.creditCheck.debts : [],
+      history: Array.isArray(item.creditCheck?.history) ? item.creditCheck.history : [],
+      message: item.creditCheck?.message || "",
+    },
   }));
 }
 
@@ -1146,6 +1190,7 @@ function viewPermission(viewName) {
     contratos: "Contratos",
     agendamentos: "Agendamentos",
     faturas: "Faturas",
+    vitrine: "Configuracoes",
     equipe: "Configuracoes",
     configuracao: "Configuracoes",
   };
@@ -1208,6 +1253,22 @@ function propertyLocation(property) {
   return property?.formattedAddress || property?.googleLocation || [property?.district, property?.city].filter(Boolean).join(", ");
 }
 
+function propertyCityValue(property) {
+  if (property?.city) return String(property.city).trim();
+  const location = propertyLocation(property);
+  if (!location) return "";
+  const stateMatch = String(location).match(/,\s*([^,\-]+?)\s*-\s*[A-Z]{2}\b/i);
+  if (stateMatch?.[1]) return stateMatch[1].trim();
+  const parts = String(location)
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .filter((part) => !/^(brasil|brazil)$/i.test(part))
+    .filter((part) => !/^[A-Z]{2}$/i.test(part));
+  const candidate = parts.length > 1 ? parts[parts.length - 1] : "";
+  return candidate.replace(/\s*-\s*[A-Z]{2}\b/i, "").trim();
+}
+
 function googleMapsLink(location) {
   if (!location) return "";
   if (/^https?:\/\//i.test(location)) return location;
@@ -1231,15 +1292,188 @@ function propertyGoogleMapsEmbed(property) {
   return googleMapsEmbed(propertyLocation(property));
 }
 
+function fillAddressFields(form, result = {}) {
+  if (!form) return;
+  const location = result.geometry?.location;
+  const lat = typeof location?.lat === "function" ? location.lat() : result.latitude;
+  const lng = typeof location?.lng === "function" ? location.lng() : result.longitude;
+  const address = result.formatted_address || result.formattedAddress || result.name || form.querySelector("[name='googleLocation']")?.value || "";
+  if (form.querySelector("[name='formattedAddress']")) form.querySelector("[name='formattedAddress']").value = address;
+  if (form.querySelector("[name='googleLocation']")) form.querySelector("[name='googleLocation']").value = address;
+  if (form.querySelector("[name='latitude']") && lat) form.querySelector("[name='latitude']").value = Number(lat).toFixed(6);
+  if (form.querySelector("[name='longitude']") && lng) form.querySelector("[name='longitude']").value = Number(lng).toFixed(6);
+  if (form.querySelector("[name='googlePlaceId']")) form.querySelector("[name='googlePlaceId']").value = result.place_id || result.googlePlaceId || "";
+  if (form.querySelector("[name='googleMapsUrl']") && lat && lng) {
+    form.querySelector("[name='googleMapsUrl']").value = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${lat},${lng}`)}`;
+  }
+  const components = result.address_components || [];
+  const city = components.find((item) => item.types?.includes("administrative_area_level_2"))?.long_name || "";
+  const district = components.find((item) => item.types?.includes("sublocality") || item.types?.includes("sublocality_level_1") || item.types?.includes("neighborhood"))?.long_name || "";
+  if (city && form.querySelector("[name='city']")) form.querySelector("[name='city']").value = city;
+  if (district && form.querySelector("[name='district']")) form.querySelector("[name='district']").value = district;
+  updateMapPreview(form);
+  updateMapSelectedAddress(form);
+}
+
+function coordinatesFromText(value = "") {
+  const decoded = decodeURIComponent(String(value));
+  const atMatch = decoded.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (atMatch) return { latitude: atMatch[1], longitude: atMatch[2] };
+  const queryMatch = decoded.match(/[?&](?:q|query)=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/);
+  if (queryMatch) return { latitude: queryMatch[1], longitude: queryMatch[2] };
+  const plainMatch = decoded.match(/(-?\d{1,3}\.\d{4,})\s*,\s*(-?\d{1,3}\.\d{4,})/);
+  if (plainMatch) return { latitude: plainMatch[1], longitude: plainMatch[2] };
+  return null;
+}
+
+function geocodePropertyForm(form) {
+  const address = form?.querySelector("[name='googleLocation']")?.value?.trim();
+  if (!address) {
+    showToast("Informe um endereco ou link do Google Maps.");
+    return;
+  }
+  const coordinates = coordinatesFromText(address);
+  if (coordinates) {
+    fillAddressFields(form, {
+      formattedAddress: form.querySelector("[name='formattedAddress']")?.value || address,
+      latitude: coordinates.latitude,
+      longitude: coordinates.longitude,
+    });
+    initPropertyMapPicker(form);
+    showToast("Coordenadas extraidas do link do Google Maps.");
+    return;
+  }
+  if (!window.google?.maps?.Geocoder) {
+    showToast("Google Maps ainda nao carregou. Configure a chave em integracoes.");
+    return;
+  }
+  const geocoder = new google.maps.Geocoder();
+  geocoder.geocode({ address }, (results, status) => {
+    if (status !== "OK" || !results?.[0]) {
+      showToast("Nao foi possivel converter este endereco em coordenadas.");
+      return;
+    }
+    fillAddressFields(form, results[0]);
+    initPropertyMapPicker(form);
+    showToast("Endereco convertido em coordenadas.");
+  });
+}
+
+function mapPositionFromForm(form) {
+  const lat = Number(form?.querySelector("[name='latitude']")?.value || 0);
+  const lng = Number(form?.querySelector("[name='longitude']")?.value || 0);
+  if (Number.isFinite(lat) && Number.isFinite(lng) && lat && lng) return { lat, lng };
+  return { lat: -24.4973, lng: -47.8448 };
+}
+
+function updateMapPreview(form) {
+  const iframe = form?.querySelector("[data-map-preview]");
+  if (!iframe) return;
+  const lat = form.querySelector("[name='latitude']")?.value;
+  const lng = form.querySelector("[name='longitude']")?.value;
+  const address = form.querySelector("[name='formattedAddress']")?.value || form.querySelector("[name='googleLocation']")?.value || "";
+  const src = lat && lng ? googleMapsEmbed(`${lat},${lng}`) : googleMapsEmbed(address);
+  if (src) iframe.src = src;
+  iframe.hidden = !src;
+  form.querySelector(".map-empty-hint")?.toggleAttribute("hidden", Boolean(src));
+}
+
+function updateMapSelectedAddress(form) {
+  const target = form?.querySelector("[data-map-selected-address]");
+  if (!target) return;
+  const address = form.querySelector("[name='formattedAddress']")?.value || form.querySelector("[name='googleLocation']")?.value;
+  const lat = form.querySelector("[name='latitude']")?.value;
+  const lng = form.querySelector("[name='longitude']")?.value;
+  target.textContent = [address || "Nenhum endereco selecionado.", lat && lng ? `${Number(lat).toFixed(6)}, ${Number(lng).toFixed(6)}` : ""].filter(Boolean).join(" | ");
+}
+
+function reverseGeocodePosition(form, position) {
+  if (!window.google?.maps?.Geocoder) {
+    fillAddressFields(form, { latitude: position.lat, longitude: position.lng, formattedAddress: `${position.lat}, ${position.lng}` });
+    return;
+  }
+  const geocoder = new google.maps.Geocoder();
+  geocoder.geocode({ location: position }, (results, status) => {
+    fillAddressFields(form, status === "OK" && results?.[0] ? results[0] : { latitude: position.lat, longitude: position.lng, formattedAddress: `${position.lat}, ${position.lng}` });
+  });
+}
+
+function initPropertyMapPicker(form) {
+  if (!form) return;
+  updateMapPreview(form);
+  updateMapSelectedAddress(form);
+  const container = form.querySelector("[data-property-map-picker]");
+  if (!container || !window.google?.maps?.Map) return;
+  let canvas = container.querySelector("[data-google-map-canvas]");
+  if (!canvas) {
+    canvas = document.createElement("div");
+    canvas.className = "google-map-canvas";
+    canvas.dataset.googleMapCanvas = "true";
+    container.append(canvas);
+  }
+  const position = mapPositionFromForm(form);
+  const map = new google.maps.Map(canvas, {
+    center: position,
+    zoom: form.querySelector("[name='latitude']")?.value ? 16 : 13,
+    mapTypeControl: false,
+    streetViewControl: false,
+    fullscreenControl: false,
+  });
+  const marker = new google.maps.Marker({
+    position,
+    map,
+    draggable: true,
+  });
+  form._propertyMap = map;
+  form._propertyMarker = marker;
+  marker.addListener("dragend", () => {
+    const next = marker.getPosition();
+    reverseGeocodePosition(form, { lat: next.lat(), lng: next.lng() });
+  });
+  map.addListener("click", (event) => {
+    const next = event.latLng;
+    marker.setPosition(next);
+    reverseGeocodePosition(form, { lat: next.lat(), lng: next.lng() });
+  });
+}
+
+function initGoogleAddressTools() {
+  document.querySelectorAll("[data-address-input]").forEach((input) => {
+    const form = input.closest("form");
+    updateMapPreview(form);
+    updateMapSelectedAddress(form);
+    if (window.google?.maps?.places && !input.dataset.autocompleteReady) {
+      const autocomplete = new google.maps.places.Autocomplete(input, {
+        fields: ["address_components", "formatted_address", "geometry", "name", "place_id"],
+        types: ["geocode", "establishment"],
+      });
+      autocomplete.addListener("place_changed", () => {
+        const place = autocomplete.getPlace();
+        fillAddressFields(form, place);
+        initPropertyMapPicker(form);
+      });
+      input.dataset.autocompleteReady = "true";
+    }
+    initPropertyMapPicker(form);
+  });
+}
+
 function loadGoogleMapsIfConfigured() {
   const maps = state.company.integrations?.googleMaps;
-  if (!maps?.apiKey || maps.enabled !== "Sim" || window.google?.maps) return;
+  if (window.google?.maps) {
+    initGoogleAddressTools();
+    return;
+  }
+  if (!maps?.apiKey || maps.enabled !== "Sim") return;
   const script = document.createElement("script");
   script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(maps.apiKey)}&libraries=places`;
   script.async = true;
   script.defer = true;
   script.dataset.googleMapsLoader = "true";
-  script.addEventListener("load", () => showToast("Google Maps carregado. Autocomplete pronto para conexao."));
+  script.addEventListener("load", () => {
+    initGoogleAddressTools();
+    showToast("Google Maps carregado. Autocomplete pronto para conexao.");
+  });
   script.addEventListener("error", () => showToast("Nao foi possivel carregar Google Maps. Verifique a chave."));
   document.head.append(script);
 }
@@ -1511,7 +1745,7 @@ function renderListFilterOptions() {
   );
   updateFilterSelect(
     '[data-filter="propertyCity"]',
-    state.properties.map((property) => property.city || locationFilterValue(propertyLocation(property))),
+    state.properties.map((property) => propertyCityValue(property) || locationFilterValue(propertyLocation(property))),
     state.filters.propertyCity,
   );
   updateFilterSelect(
@@ -1541,7 +1775,7 @@ function renderProperties() {
       (availability === "available" && property.available) ||
       (availability === "unavailable" && !property.available);
     const typeMatch = type === "all" || property.type === type;
-    const cityMatch = city === "all" || normalize(property.city || propertyLocation(property)).includes(normalize(city));
+    const cityMatch = city === "all" || normalize(propertyCityValue(property) || propertyLocation(property)).includes(normalize(city));
     return searchMatch && purposeMatch && availabilityMatch && typeMatch && cityMatch;
   });
 
@@ -1585,6 +1819,7 @@ function renderProperties() {
           <span class="pill purpose-pill">${purpose}</span>
           <span class="pill ${property.available ? "available-pill" : "unavailable-pill"}">${property.available ? "Disponivel" : "Indisponivel"}</span>
           <span class="pill">${area} m2</span>
+          <span class="pill">Pet: ${escapeHtml(property.acceptsPet || "Nao")}</span>
         </div>
         <h3>${title}</h3>
         <div class="price">${formatter.format(propertyNetValue(property))}</div>
@@ -2279,11 +2514,34 @@ function publicProperties() {
     const text = normalize(`${property.title} ${property.type} ${property.subtype} ${property.purpose} ${propertyLocation(property)} ${property.notes}`);
     const queryMatch = !query || text.includes(query);
     const purposeMatch = purpose === "all" || property.purpose === purpose;
-    const cityMatch = city === "all" || normalize(property.city || propertyLocation(property)).includes(normalize(city));
+    const cityMatch = city === "all" || normalize(propertyCityValue(property) || propertyLocation(property)).includes(normalize(city));
     const typeMatch = type === "all" || property.type === type;
     const priceMatch = !maxPrice || propertyNetValue(property) <= maxPrice;
     return queryMatch && purposeMatch && cityMatch && typeMatch && priceMatch;
   });
+}
+
+const vitrineBlockCatalog = {
+  hero: ["Hero principal", "Titulo, chamada e carrossel inicial"],
+  busca: ["Busca de imoveis", "Filtros por cidade, tipo e finalidade"],
+  destaques: ["Imoveis em destaque", "Carrossel e cards de imoveis marcados"],
+  midia: ["Galeria institucional", "Fotos, videos, regioes e loteamentos"],
+  textos: ["Blocos editoriais", "Textos livres para campanhas e regioes"],
+  contato: ["Contato e equipe", "Empresa, canais e corretores"],
+};
+
+function siteConfig() {
+  const site = state.company.site || {};
+  const defaultOrder = Object.keys(vitrineBlockCatalog);
+  site.blockOrder = Array.isArray(site.blockOrder) && site.blockOrder.length ? site.blockOrder : defaultOrder;
+  site.blockVisibility = { hero: true, busca: true, destaques: true, midia: true, textos: true, contato: true, ...(site.blockVisibility || {}) };
+  state.company.site = site;
+  return site;
+}
+
+function isVitrineBlockVisible(block) {
+  const site = siteConfig();
+  return site.blockVisibility?.[block] !== false;
 }
 
 function publicContactHref(property = null) {
@@ -2332,7 +2590,159 @@ function renderPublicContactPage() {
   }
 }
 
+function renderPublicEditorContent() {
+  const container = document.querySelector("#site-editor-content");
+  if (!container) return;
+  const site = siteConfig();
+  const media = Array.isArray(site.media) ? site.media : [];
+  const textBlocks = Array.isArray(site.textBlocks) ? site.textBlocks : [];
+  const showMedia = isVitrineBlockVisible("midia") && media.length;
+  const showTexts = isVitrineBlockVisible("textos") && textBlocks.length;
+  if (!showMedia && !showTexts) {
+    container.innerHTML = "";
+    return;
+  }
+  container.innerHTML = `
+    <div class="site-editor-layout">
+      ${
+        showMedia
+          ? `<div class="site-editor-media">
+              ${media
+                .slice(0, 4)
+                .map((item) => (String(item.type || "").startsWith("video/") ? `<video src="${escapeHtml(item.data || "")}" muted controls></video>` : `<img src="${escapeHtml(getPhotoSrc(item))}" alt="${escapeHtml(item.label || item.name || "Midia da vitrine")}">`))
+                .join("")}
+            </div>`
+          : ""
+      }
+      ${
+        showTexts
+          ? `<div class="site-editor-texts">
+              ${textBlocks
+                .map(
+                  (block) => `
+                    <article>
+                      <p class="eyebrow">Vitrine</p>
+                      <h3>${escapeHtml(block.title || "")}</h3>
+                      <p>${escapeHtml(block.subtitle || "")}</p>
+                    </article>
+                  `,
+                )
+                .join("")}
+            </div>`
+          : ""
+      }
+    </div>
+  `;
+}
+
+function renderVitrineBlockSettings(site, activeBlock) {
+  const media = Array.isArray(site.media) ? site.media : [];
+  const textBlocks = Array.isArray(site.textBlocks) ? site.textBlocks : [];
+  if (activeBlock === "hero") {
+    return `
+      <label>Chamada superior<input name="heroEyebrow" value="${escapeHtml(site.heroEyebrow || "Registro e regiao")}" /></label>
+      <label>Titulo da Home<input name="heroTitle" value="${escapeHtml(site.heroTitle || state.company.name || "Regis Imobiliaria")}" /></label>
+      <label>Texto do hero<textarea name="featuredText" rows="4">${escapeHtml(site.featuredText || "")}</textarea></label>
+    `;
+  }
+  if (activeBlock === "busca") {
+    return `
+      <label>Placeholder da busca<input name="searchPlaceholder" value="${escapeHtml(site.searchPlaceholder || "Cidade, bairro, tipo ou codigo")}" /></label>
+      <div class="vitrine-setting-note">A busca publica continua usando os imoveis disponiveis do sistema e os filtros de cidade, tipo, finalidade e valor.</div>
+    `;
+  }
+  if (activeBlock === "destaques") {
+    return `
+      <label>Texto dos destaques<textarea name="featuredText" rows="4">${escapeHtml(site.featuredText || "")}</textarea></label>
+      <div class="vitrine-setting-note">Para controlar quais imoveis aparecem, abra o perfil do imovel e marque a estrela Destaque na Home.</div>
+    `;
+  }
+  if (activeBlock === "midia") {
+    return `
+      <label class="mini-upload">Adicionar midia<input type="file" accept="image/*,video/*" multiple data-vitrine-media-upload /></label>
+      <div class="vitrine-asset-list compact">
+        ${media.length ? media.map((item, index) => `
+          <article>
+            ${String(item.type || "").startsWith("video/") ? `<video src="${escapeHtml(item.data || "")}" muted></video>` : `<img src="${escapeHtml(getPhotoSrc(item))}" alt="">`}
+            <input value="${escapeHtml(item.label || item.name || `Midia ${index + 1}`)}" data-vitrine-media-label="${index}" />
+            <button class="danger-button" type="button" data-remove-vitrine-media="${index}">Remover</button>
+          </article>
+        `).join("") : '<p class="empty-inline">Nenhuma midia cadastrada.</p>'}
+      </div>
+    `;
+  }
+  if (activeBlock === "textos") {
+    return `
+      <div class="vitrine-text-add inline" data-vitrine-text-form>
+        <label>Titulo<input name="title" placeholder="Regioes em expansao" /></label>
+        <label>Texto<input name="subtitle" placeholder="Loteamentos, bairros e oportunidades" /></label>
+        <button class="submit-button" type="button" data-add-vitrine-text>Adicionar bloco</button>
+      </div>
+      <div class="vitrine-text-list">
+        ${textBlocks.length ? textBlocks.map((block, index) => `
+          <article class="document-edit-item">
+            <div><strong>${escapeHtml(block.title || "Texto sem titulo")}</strong><small>${escapeHtml(block.subtitle || "")}</small></div>
+            <button class="danger-button" type="button" data-remove-vitrine-text="${index}">Remover</button>
+          </article>
+        `).join("") : '<p class="empty-inline">Nenhum bloco livre cadastrado.</p>'}
+      </div>
+    `;
+  }
+  return `
+    <label>Texto sobre a empresa<textarea name="aboutText" rows="5">${escapeHtml(site.aboutText || "")}</textarea></label>
+    <div class="vitrine-setting-note">Os canais de contato e corretores continuam vindo de Configuracao > Perfil da empresa e Usuarios.</div>
+  `;
+}
+
+function renderVitrinePreviewBlock(block, site, media, textBlocks) {
+  if (!isVitrineBlockVisible(block)) return "";
+  if (block === "hero") return `<div class="vitrine-preview-hero" data-preview-block="hero"><p class="eyebrow">${escapeHtml(site.heroEyebrow || "Registro e regiao")}</p><h1>${escapeHtml(site.heroTitle || state.company.name || "Regis Imobiliaria")}</h1><p>${escapeHtml(site.featuredText || "Imoveis escolhidos pela equipe para compra, locacao e temporada.")}</p></div>`;
+  if (block === "busca") return `<div class="vitrine-preview-search" data-preview-block="busca"><span>${escapeHtml(site.searchPlaceholder || "Cidade, bairro, tipo ou codigo")}</span><button type="button">Buscar</button></div>`;
+  if (block === "destaques") return `<div class="vitrine-preview-grid" data-preview-block="destaques">${state.properties.filter((property) => property.available !== false).slice(0, 3).map((property) => { const src = getPhotoSrc(property.photos?.[0]); return `<article>${src ? `<img src="${src}" alt="">` : `<div></div>`}<strong>${escapeHtml(property.title)}</strong><span>${formatter.format(propertyNetValue(property))}</span></article>`; }).join("")}</div>`;
+  if (block === "midia") return media.length ? `<div class="vitrine-preview-media" data-preview-block="midia">${media.slice(0, 3).map((item) => (String(item.type || "").startsWith("video/") ? `<video src="${escapeHtml(item.data || "")}" muted></video>` : `<img src="${escapeHtml(getPhotoSrc(item))}" alt="">`)).join("")}</div>` : "";
+  if (block === "textos") return textBlocks.length ? `<div class="vitrine-preview-texts" data-preview-block="textos">${textBlocks.slice(0, 3).map((item) => `<article><strong>${escapeHtml(item.title || "Texto")}</strong><span>${escapeHtml(item.subtitle || "")}</span></article>`).join("")}</div>` : "";
+  return `<div class="vitrine-preview-contact" data-preview-block="contato"><strong>${escapeHtml(state.company.name || "Regis Imobiliaria")}</strong><span>${escapeHtml(state.company.phone || state.company.email || "Contato da empresa")}</span></div>`;
+}
+
+function renderVitrineEditor() {
+  const container = document.querySelector("#vitrine-editor");
+  if (!container) return;
+  const site = siteConfig();
+  const media = Array.isArray(site.media) ? site.media : [];
+  const textBlocks = Array.isArray(site.textBlocks) ? site.textBlocks : [];
+  const blockOrder = site.blockOrder.filter((block) => vitrineBlockCatalog[block]);
+  const activeBlock = vitrineBlockCatalog[state.vitrineActiveBlock] ? state.vitrineActiveBlock : blockOrder[0] || "hero";
+  state.vitrineActiveBlock = activeBlock;
+  const featuredCount = state.properties.filter((property) => property.available !== false && property.featured).length;
+  const blockDetails = { ...vitrineBlockCatalog, destaques: ["Imoveis em destaque", `${featuredCount} imovel${featuredCount === 1 ? "" : "is"} marcado${featuredCount === 1 ? "" : "s"}`], midia: ["Galeria institucional", `${media.length} midia${media.length === 1 ? "" : "s"}`], textos: ["Blocos editoriais", `${textBlocks.length} bloco${textBlocks.length === 1 ? "" : "s"} de texto`] };
+  container.innerHTML = `
+    <div class="vitrine-workspace">
+      <aside class="vitrine-blocks-panel">
+        <div class="vitrine-panel-title"><p class="eyebrow">Blocos</p><h3>Estrutura do site</h3></div>
+        <div class="vitrine-block-list">
+          ${blockOrder.map((id, index) => {
+            const [title, description] = blockDetails[id];
+            const visible = isVitrineBlockVisible(id);
+            return `<article class="vitrine-block ${id === activeBlock ? "active" : ""} ${visible ? "" : "is-hidden"}"><button class="vitrine-block-select" type="button" data-select-vitrine-block="${id}"><span>${String(index + 1).padStart(2, "0")}</span><div><strong>${escapeHtml(title)}</strong><small>${escapeHtml(description)}</small></div></button><div class="vitrine-block-actions"><button type="button" data-move-vitrine-block="up" data-vitrine-block-id="${id}" ${index === 0 ? "disabled" : ""}>Subir</button><button type="button" data-move-vitrine-block="down" data-vitrine-block-id="${id}" ${index === blockOrder.length - 1 ? "disabled" : ""}>Descer</button><button type="button" data-toggle-vitrine-block="${id}">${visible ? "Ocultar" : "Exibir"}</button></div></article>`;
+          }).join("")}
+        </div>
+      </aside>
+      <main class="vitrine-preview-panel">
+        <div class="vitrine-preview-toolbar"><div><p class="eyebrow">Previa</p><strong>${escapeHtml(site.heroTitle || state.company.name || "Regis Imobiliaria")}</strong></div><div class="segmented-control vitrine-device-tabs" aria-label="Previa responsiva"><button class="segment ${state.vitrineDevice === "desktop" ? "active" : ""}" type="button" data-vitrine-device="desktop">Desktop</button><button class="segment ${state.vitrineDevice === "mobile" ? "active" : ""}" type="button" data-vitrine-device="mobile">Mobile</button></div></div>
+        <section class="vitrine-preview-canvas ${escapeHtml(site.model || "executivo")} ${escapeHtml(site.layout || "imersivo")} ${state.vitrineDevice === "mobile" ? "mobile-preview" : ""}">${blockOrder.map((block) => renderVitrinePreviewBlock(block, site, media, textBlocks)).join("")}</section>
+      </main>
+      <aside class="vitrine-properties-panel">
+        <form class="vitrine-form" data-vitrine-form><div class="vitrine-panel-title"><p class="eyebrow">Propriedades</p><h3>${escapeHtml(blockDetails[activeBlock]?.[0] || "Bloco")}</h3></div><label>Modelo<select name="model">${["executivo", "premium", "urbano", "editorial"].map((model) => `<option value="${model}" ${site.model === model ? "selected" : ""}>${model.replace(/^./, (letter) => letter.toUpperCase())}</option>`).join("")}</select></label><label>Layout<select name="layout">${["imersivo", "grade", "compacto"].map((layout) => `<option value="${layout}" ${site.layout === layout ? "selected" : ""}>${layout.replace(/^./, (letter) => letter.toUpperCase())}</option>`).join("")}</select></label>${renderVitrineBlockSettings(site, activeBlock)}<button class="submit-button" type="submit">Salvar alteracoes</button></form>
+      </aside>
+    </div>
+  `;
+}
 function renderPublicBranding() {
+  const publicSite = document.querySelector("#site-publico");
+  if (publicSite) {
+    publicSite.dataset.siteModel = state.company.site?.model || "executivo";
+    publicSite.dataset.siteLayout = state.company.site?.layout || "imersivo";
+  }
   document.querySelectorAll("[data-public-company-name]").forEach((item) => {
     item.textContent = state.company.name || "Regis Imobiliaria";
   });
@@ -2340,7 +2750,13 @@ function renderPublicBranding() {
     item.textContent = state.company.creci ? `CRECI ${state.company.creci}` : "Imobiliaria";
   });
   const heroTitle = document.querySelector("[data-public-hero-title]");
-  if (heroTitle) heroTitle.textContent = state.company.name || "Regis Imobiliaria";
+  if (heroTitle) heroTitle.textContent = state.company.site?.heroTitle || state.company.name || "Regis Imobiliaria";
+  const heroEyebrow = document.querySelector("[data-public-hero-eyebrow]");
+  if (heroEyebrow) heroEyebrow.textContent = state.company.site?.heroEyebrow || "Registro e regiao";
+  const aboutText = document.querySelector("[data-public-about-text]");
+  if (aboutText) aboutText.textContent = state.company.site?.aboutText || "Atendimento imobiliario para compra, locacao, captacao de imoveis, contratos e acompanhamento comercial em Registro e regiao.";
+  const publicSearch = document.querySelector("[data-public-filter='query']");
+  if (publicSearch) publicSearch.placeholder = state.company.site?.searchPlaceholder || "Cidade, bairro, tipo ou codigo";
   const logo = document.querySelector("[data-public-logo]");
   if (logo) {
     logo.innerHTML = state.company.logo ? `<img src="${state.company.logo}" alt="${escapeHtml(state.company.name || "Logo")}">` : "RI";
@@ -2349,11 +2765,16 @@ function renderPublicBranding() {
   if (whatsapp) whatsapp.href = publicContactHref();
   const email = document.querySelector("[data-public-email]");
   if (email) email.href = `mailto:${state.company.email || ""}`;
+  document.querySelector(".site-hero")?.toggleAttribute("hidden", !isVitrineBlockVisible("hero"));
+  document.querySelector(".site-search-band")?.toggleAttribute("hidden", !isVitrineBlockVisible("busca"));
+  document.querySelector("#site-imoveis")?.toggleAttribute("hidden", !isVitrineBlockVisible("destaques"));
+  document.querySelector("[data-public-page='contato']")?.toggleAttribute("hidden", !isVitrineBlockVisible("contato"));
   renderPublicContactPage();
+  renderPublicEditorContent();
 }
 
 function setPublicPage(page = "home") {
-  const allowed = ["home", "imoveis", "contato"];
+  const allowed = ["home", "imoveis", "regiao", "contato"];
   const activePage = allowed.includes(page) ? page : "home";
   document.querySelectorAll("[data-public-page]").forEach((section) => {
     section.classList.toggle("active", section.dataset.publicPage === activePage);
@@ -2365,8 +2786,9 @@ function setPublicPage(page = "home") {
 
 function publicPageFromHash() {
   const hash = window.location.hash.replace("#", "");
-  if (["home", "imoveis", "contato"].includes(hash)) return hash;
+  if (["home", "imoveis", "regiao", "contato"].includes(hash)) return hash;
   if (hash === "site-imoveis") return "imoveis";
+  if (hash === "site-regiao") return "regiao";
   if (hash === "site-contato") return "contato";
   return "home";
 }
@@ -2383,7 +2805,7 @@ function renderPublicCityOptions() {
   const select = document.querySelector("[data-public-filter='city']");
   if (!select) return;
   const selected = state.filters.publicCity;
-  const cities = [...new Set(state.properties.filter((property) => property.available !== false).map((property) => property.city).filter(Boolean))].sort();
+  const cities = [...new Set(state.properties.filter((property) => property.available !== false).map((property) => propertyCityValue(property)).filter(Boolean))].sort((a, b) => a.localeCompare(b, "pt-BR"));
   select.innerHTML = `<option value="all">Todas</option>${cities.map((city) => `<option value="${escapeHtml(city)}" ${city === selected ? "selected" : ""}>${escapeHtml(city)}</option>`).join("")}`;
 }
 
@@ -2430,6 +2852,7 @@ function renderPublicProperties() {
         property.subtype || property.type,
         hasPositiveNumber(property.rooms) ? `${property.rooms} quartos` : "",
         hasPositiveNumber(property.area) ? `${property.area} m2` : "",
+        property.acceptsPet ? `Aceita pet: ${property.acceptsPet}` : "",
       ]
         .filter(Boolean)
         .join(" · ");
@@ -2536,6 +2959,7 @@ function renderPublicProperties() {
         property.subtype || property.type,
         hasPositiveNumber(property.rooms) ? `${property.rooms} quartos` : "",
         hasPositiveNumber(property.area) ? `${property.area} m2` : "",
+        property.acceptsPet ? `Aceita pet: ${property.acceptsPet}` : "",
       ]
         .filter(Boolean)
         .join(" · ");
@@ -2573,7 +2997,9 @@ function renderPublicPropertyDetail(propertyId) {
   const title = document.querySelector("#public-property-title");
   if (!modal || !content) return;
   const photos = Array.isArray(property.photos) ? property.photos : [];
-  const mainPhoto = getPhotoSrc(photos[0]);
+  const safeIndex = Math.min(state.publicDetailPhotoIndex || 0, Math.max(photos.length - 1, 0));
+  state.publicDetailPhotoIndex = safeIndex;
+  const mainPhoto = getPhotoSrc(photos[safeIndex]);
   const map = propertyGoogleMapsEmbed(property);
   const details = [
     ["Finalidade", property.purpose],
@@ -2582,19 +3008,37 @@ function renderPublicPropertyDetail(propertyId) {
     ["Area", hasPositiveNumber(property.area) ? `${property.area} m2` : ""],
     ["Quartos", hasPositiveNumber(property.rooms) ? property.rooms : ""],
     ["Garagem", property.garage],
+    ["Aceita pet", property.acceptsPet || "Nao"],
     ["IPTU", property.iptu ? formatter.format(Number(property.iptu || 0)) : ""],
   ].filter(([, value]) => value);
   if (title) title.textContent = property.title;
   content.innerHTML = `
     <div class="public-detail-layout">
       <section class="public-detail-gallery">
-        <div class="public-detail-main-photo">${mainPhoto ? `<img src="${mainPhoto}" alt="Foto de ${escapeHtml(property.title)}">` : "<span>Sem foto principal</span>"}</div>
+        <div class="public-detail-main-photo">
+          ${
+            mainPhoto
+              ? `<button class="public-photo-open" type="button" data-open-public-photo="${property.id}" aria-label="Abrir foto ampliada">
+                  <img src="${mainPhoto}" alt="Foto de ${escapeHtml(property.title)}">
+                </button>`
+              : "<span>Sem foto principal</span>"
+          }
+          ${
+            photos.length > 1
+              ? `<div class="public-detail-controls">
+                  <button type="button" data-public-detail-photo="prev" data-public-property-id="${property.id}" aria-label="Foto anterior">&lt;</button>
+                  <span>${safeIndex + 1} / ${photos.length}</span>
+                  <button type="button" data-public-detail-photo="next" data-public-property-id="${property.id}" aria-label="Proxima foto">&gt;</button>
+                </div>`
+              : ""
+          }
+        </div>
         <div class="public-detail-thumbs">
           ${photos
             .slice(0, 6)
-            .map((photo) => {
+            .map((photo, index) => {
               const src = getPhotoSrc(photo);
-              return src ? `<img src="${src}" alt="${escapeHtml(photo.label || property.title)}">` : "";
+              return src ? `<button class="${index === safeIndex ? "active" : ""}" type="button" data-public-detail-thumb="${index}" data-public-property-id="${property.id}" aria-label="Ver foto ${index + 1}"><img src="${src}" alt="${escapeHtml(photo.label || property.title)}"></button>` : "";
             })
             .join("")}
         </div>
@@ -2618,6 +3062,23 @@ function renderPublicPropertyDetail(propertyId) {
     </div>
   `;
   modal.hidden = false;
+}
+
+function openPublicPhotoLightbox(propertyId) {
+  const property = findProperty(propertyId);
+  if (!property) return;
+  const photos = Array.isArray(property.photos) ? property.photos : [];
+  const photo = photos[state.publicDetailPhotoIndex || 0];
+  const src = getPhotoSrc(photo);
+  if (!src) return;
+  const lightbox = document.querySelector("#public-photo-lightbox");
+  const image = document.querySelector("#public-photo-lightbox-image");
+  const caption = document.querySelector("#public-photo-lightbox-caption");
+  if (!lightbox || !image) return;
+  image.src = src;
+  image.alt = `Foto de ${property.title}`;
+  if (caption) caption.textContent = photo?.label || property.title || "Foto do imovel";
+  lightbox.hidden = false;
 }
 
 function setAppMode(authenticated = state.authenticated) {
@@ -2711,6 +3172,7 @@ function render() {
   renderListFilterOptions();
   renderAppointments();
   renderInvoices();
+  renderVitrineEditor();
   renderOwnerOptions();
   renderPropertySubtypeOptions(document.querySelector("#property-form [name='subtype']")?.value || "");
   renderContractOptions();
@@ -2720,10 +3182,14 @@ function render() {
 }
 
 function setView(viewName) {
+  const previousView = document.querySelector(".view.active")?.dataset.view;
   if (state.authenticated && !canOpenView(viewName)) {
     showToast("Seu usuario nao tem permissao para acessar este modulo.");
     const fallback = Array.from(document.querySelectorAll("[data-view-link]")).find((link) => !link.hidden)?.dataset.viewLink || "painel";
     viewName = fallback === viewName ? "painel" : fallback;
+  }
+  if (viewName === "vitrine" && previousView && previousView !== "vitrine") {
+    state.lastInternalView = previousView;
   }
   document.querySelectorAll("[data-view]").forEach((view) => {
     view.classList.toggle("active", view.dataset.view === viewName);
@@ -2731,6 +3197,7 @@ function setView(viewName) {
   document.querySelectorAll("[data-view-link]").forEach((link) => {
     link.classList.toggle("active", link.dataset.viewLink === viewName);
   });
+  document.body.classList.toggle("vitrine-mode", viewName === "vitrine");
 }
 
 function setForm(formName) {
@@ -2779,13 +3246,19 @@ function renderProfile(mode = "view") {
 
   const content = document.querySelector("#profile-content");
   content.innerHTML = mode === "edit" ? renderEditProfile(type, entity) : renderViewProfile(type, entity);
+  initGoogleAddressTools();
 }
 
 function renderProfileTabs(type) {
+  const tabs = [
+    ["summary", "Resumo"],
+    ["documents", "Documentos"],
+  ];
+  if (type === "client") tabs.splice(1, 0, ["consultation", "Consulta"]);
+  if (!tabs.some(([tab]) => tab === state.activeProfileTab)) state.activeProfileTab = "summary";
   return `
-    <div class="profile-tabs two-tabs">
-      <button class="segment ${state.activeProfileTab === "summary" ? "active" : ""}" type="button" data-profile-tab="summary">Resumo</button>
-      <button class="segment ${state.activeProfileTab === "documents" ? "active" : ""}" type="button" data-profile-tab="documents">Documentos</button>
+    <div class="profile-tabs ${tabs.length === 2 ? "two-tabs" : ""}">
+      ${tabs.map(([tab, label]) => `<button class="segment ${state.activeProfileTab === tab ? "active" : ""}" type="button" data-profile-tab="${tab}">${label}</button>`).join("")}
     </div>
   `;
 }
@@ -2798,6 +3271,7 @@ function renderViewProfile(type, entity) {
   return `
     ${renderProfileTabs(type)}
     ${state.activeProfileTab === "summary" ? renderSummaryTab(type, entity) : ""}
+    ${state.activeProfileTab === "consultation" && type === "client" ? renderClientConsultationTab(entity) : ""}
     ${state.activeProfileTab === "documents" ? renderDocumentsTab(type, entity, documents) : ""}
   `;
 }
@@ -3240,6 +3714,176 @@ function renderSummaryTab(type, entity) {
   `;
 }
 
+function renderClientConsultationTab(client) {
+  const credit = client.creditCheck || {};
+  const endpoint = state.company.integrations?.creditBureau?.endpoint || "";
+  const debts = Array.isArray(credit.debts) ? credit.debts : [];
+  const history = Array.isArray(credit.history) ? credit.history : [];
+  return `
+    <section class="consultation-panel">
+      <div class="consultation-header">
+        <div>
+          <p class="eyebrow">Serasa / SPC</p>
+          <h3>Consulta de credito do cliente</h3>
+          <p>Consulta condicionada a autorizacao do cliente e a uma integracao oficial configurada em backend seguro.</p>
+        </div>
+        <span class="consultation-status ${credit.status === "Consultado" ? "ok" : credit.status === "Erro" ? "error" : ""}">${escapeHtml(credit.status || "Nao consultado")}</span>
+      </div>
+      <div class="consultation-grid">
+        <article>
+          <span>Cliente</span>
+          <strong>${escapeHtml(client.name || "Nao informado")}</strong>
+        </article>
+        <article>
+          <span>CPF</span>
+          <strong>${escapeHtml(client.cpf || "Nao informado")}</strong>
+        </article>
+        <article>
+          <span>Situacao do nome</span>
+          <strong>${escapeHtml(credit.nameStatus || "Aguardando consulta")}</strong>
+        </article>
+        <article>
+          <span>Score</span>
+          <strong>${escapeHtml(credit.score || "Aguardando consulta")}</strong>
+        </article>
+      </div>
+      <div class="consultation-actions">
+        <button class="secondary-button" type="button" data-authorize-credit-check="${client.id}">
+          ${credit.authorized ? "Autorizacao registrada" : "Registrar autorizacao"}
+        </button>
+        <button class="submit-button" type="button" data-run-credit-check="${client.id}" ${credit.authorized ? "" : "disabled"}>
+          Consultar CPF
+        </button>
+      </div>
+      ${
+        endpoint
+          ? '<p class="consultation-note">Integracao configurada. A consulta sera enviada ao endpoint seguro do sistema.</p>'
+          : '<p class="consultation-note">Nenhum endpoint de Serasa/SPC configurado. Conecte uma API oficial no backend para retornar score, situacao e inadimplencias reais.</p>'
+      }
+      <section class="consultation-debts">
+        <h3>Inadimplencias detalhadas</h3>
+        ${
+          debts.length
+            ? debts
+                .map(
+                  (debt) => `
+                    <article>
+                      <div>
+                        <strong>${escapeHtml(debt.creditor || "Credor nao informado")}</strong>
+                        <small>${escapeHtml(debt.date || debt.dueDate || "Data nao informada")}</small>
+                      </div>
+                      <span>${escapeHtml(debt.amount ? formatter.format(Number(debt.amount || 0)) : "Valor nao informado")}</span>
+                      <p>${escapeHtml(debt.description || debt.contract || "")}</p>
+                    </article>
+                  `,
+                )
+                .join("")
+            : '<p class="empty-inline">Nenhuma inadimplencia retornada pela consulta.</p>'
+        }
+      </section>
+      <section class="consultation-history">
+        <h3>Historico de consultas</h3>
+        ${
+          history.length
+            ? history
+                .slice(0, 6)
+                .map((item) => `<p><strong>${escapeHtml(formatDate(item.checkedAt) || item.checkedAt || "")}</strong> - ${escapeHtml(item.status || "")}${item.score ? ` | Score ${escapeHtml(item.score)}` : ""}</p>`)
+                .join("")
+            : '<p class="empty-inline">Nenhuma consulta registrada.</p>'
+        }
+      </section>
+    </section>
+  `;
+}
+
+async function runClientCreditCheck(clientId) {
+  const client = findClient(clientId);
+  if (!client) return;
+  if (!client.creditCheck?.authorized) {
+    showToast("Registre a autorizacao do cliente antes da consulta.");
+    return;
+  }
+  const endpoint = state.company.integrations?.creditBureau?.endpoint || "";
+  if (!endpoint) {
+    client.creditCheck = {
+      ...(client.creditCheck || {}),
+      status: "Aguardando integracao",
+      message: "Configure um endpoint backend oficial para Serasa/SPC.",
+    };
+    saveAll();
+    renderProfile();
+    showToast("Integre um endpoint oficial Serasa/SPC para consultar CPF.");
+    return;
+  }
+
+  const checkedAt = new Date().toISOString();
+  client.creditCheck = {
+    ...(client.creditCheck || {}),
+    status: "Consultando",
+    lastCheckedAt: checkedAt,
+  };
+  saveAll();
+  renderProfile();
+
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        clientId: client.id,
+        name: client.name,
+        cpf: client.cpf,
+        authorizedAt: client.creditCheck.authorizedAt,
+      }),
+    });
+    if (!response.ok) throw new Error(`Consulta recusada pelo endpoint (${response.status}).`);
+    const result = await response.json();
+    const debts = Array.isArray(result.debts) ? result.debts : Array.isArray(result.inadimplencias) ? result.inadimplencias : [];
+    const nextStatus = result.status || "Consultado";
+    client.creditCheck = {
+      ...(client.creditCheck || {}),
+      status: nextStatus,
+      score: result.score ?? "",
+      nameStatus: result.nameStatus || result.situacaoNome || result.situation || "",
+      debts,
+      lastCheckedAt: checkedAt,
+      message: result.message || "",
+      history: [
+        {
+          checkedAt,
+          status: nextStatus,
+          score: result.score ?? "",
+          nameStatus: result.nameStatus || result.situacaoNome || result.situation || "",
+          debtCount: debts.length,
+        },
+        ...(client.creditCheck?.history || []),
+      ].slice(0, 20),
+    };
+    saveAll();
+    renderProfile();
+    showToast("Consulta de CPF atualizada.");
+  } catch (error) {
+    client.creditCheck = {
+      ...(client.creditCheck || {}),
+      status: "Erro",
+      message: error.message || "Falha ao consultar CPF.",
+      history: [
+        {
+          checkedAt,
+          status: "Erro",
+          score: "",
+          nameStatus: error.message || "Falha ao consultar CPF.",
+          debtCount: 0,
+        },
+        ...(client.creditCheck?.history || []),
+      ].slice(0, 20),
+    };
+    saveAll();
+    renderProfile();
+    showToast("Nao foi possivel consultar o CPF.");
+  }
+}
+
 function hasPositiveNumber(value) {
   return Number(value || 0) > 0;
 }
@@ -3262,6 +3906,7 @@ function renderPropertyDetails(entity, owner) {
     hasPositiveNumber(entity.area) ? `<p><strong>Area:</strong> ${escapeHtml(entity.area)} m2</p>` : "",
     entity.leisureArea === "Sim" ? "<p><strong>Area de lazer:</strong> Sim</p>" : "",
     entity.pool === "Sim" ? "<p><strong>Piscina:</strong> Sim</p>" : "",
+    `<p><strong>Aceita pet:</strong> ${escapeHtml(entity.acceptsPet || "Nao")}</p>`,
     entity.garage === "Sim" && hasPositiveNumber(entity.garageSpaces)
       ? `<p><strong>Garagem:</strong> ${escapeHtml(entity.garageSpaces)} vaga(s)</p>`
       : "",
@@ -3417,7 +4062,7 @@ function renderDocumentList(documents, type, entityId = "") {
                       <small>${doc.oversized ? "Arquivo grande removido" : `${Math.max(1, Math.round((doc.size || 0) / 1024))} KB`}</small>
                     </div>
                     <div class="document-actions">
-                      ${doc.data ? `<a class="secondary-button" href="${doc.data}" target="_blank" rel="noopener">Abrir</a>` : ""}
+                      ${doc.data ? `<button class="secondary-button" type="button" data-open-document="${index}" data-document-type="${type}" data-document-entity="${entityId}">Abrir</button>` : ""}
                       ${canEditEntity(type) ? `<button class="danger-button" type="button" data-remove-document="${index}" data-document-type="${type}" data-document-entity="${entityId}">Excluir</button>` : ""}
                     </div>
                   </article>
@@ -3428,6 +4073,37 @@ function renderDocumentList(documents, type, entityId = "") {
       }
     </div>
   `;
+}
+
+function openStoredDocument(type, index, entityId = "") {
+  const entity = documentEntity(type, entityId);
+  const doc = entity?.documents?.[Number(index)];
+  if (!doc?.data) {
+    showToast("Documento sem arquivo armazenado.");
+    return;
+  }
+  try {
+    const [header, base64 = ""] = String(doc.data).split(",");
+    const mime = header.match(/data:(.*?);base64/)?.[1] || doc.type || "application/octet-stream";
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+    const blob = new Blob([bytes], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const opened = window.open(url, "_blank", "noopener");
+    if (!opened) {
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = doc.name || doc.label || "documento";
+      document.body.append(link);
+      link.click();
+      link.remove();
+    }
+    window.setTimeout(() => URL.revokeObjectURL(url), 15000);
+  } catch (error) {
+    console.error(error);
+    showToast("Nao foi possivel abrir o documento.");
+  }
 }
 
 function renderContractItem(contract) {
@@ -3465,6 +4141,7 @@ const settingsTools = {
   },
   users: { title: "Usuarios", description: "Controle simples da equipe e niveis de acesso." },
   whatsapp: { title: "WhatsApp", description: "Configure atendimento, mensagem padrao e dados para conexao com WhatsApp Cloud API." },
+  integrations: { title: "Integracoes", description: "Conecte APIs externas, mapas, armazenamento e consulta de credito." },
   notifications: { title: "Notificacoes", description: "Alertas de vencimento, tarefas e retorno comercial." },
   backup: { title: "Backup", description: "Exportacao local completa dos dados salvos no navegador." },
   appearance: { title: "Aparencia", description: "Identidade visual baseada na marca Regis Imobiliaria." },
@@ -3492,6 +4169,7 @@ function renderSettingsTool(tool, config) {
   if (tool === "trash") return renderTrashSettings();
   if (tool === "users") return renderUsersSettings();
   if (tool === "whatsapp") return renderWhatsAppSettings();
+  if (tool === "integrations") return renderIntegrationsSettings();
   if (tool === "backup") return renderBackupSettings(config);
   if (tool === "reports") return renderReportsSettings(config);
   if (tool === "help") return renderHelpSettings();
@@ -3516,6 +4194,7 @@ function renderIntegrationsSettings() {
   const maps = integrations.googleMaps || {};
   const cloud = integrations.cloud || {};
   const database = integrations.database || {};
+  const creditBureau = integrations.creditBureau || {};
   const whatsapp = state.company.whatsapp || {};
   return `
     <form class="settings-panel integration-panel" data-integrations-form>
@@ -3583,6 +4262,16 @@ function renderIntegrationsSettings() {
         <label>Business Account ID<input name="whatsappBusinessAccountId" value="${escapeHtml(whatsapp.businessAccountId || "")}" /></label>
         <label>Webhook verify token<input name="whatsappWebhookVerifyToken" value="${escapeHtml(whatsapp.webhookVerifyToken || "")}" /></label>
         <label class="full">Access token<input name="whatsappAccessToken" value="${escapeHtml(whatsapp.accessToken || "")}" placeholder="Guarde no backend em producao" /></label>
+      </section>
+
+      <section class="integration-card">
+        <div>
+          <p class="eyebrow">Serasa / SPC</p>
+          <h3>Consulta de credito</h3>
+          <p>Informe o endpoint do backend que possui contrato e credenciais oficiais. Tokens dos bureaus nao devem ficar no navegador.</p>
+        </div>
+        <label class="full">Endpoint seguro<input name="creditBureauEndpoint" value="${escapeHtml(creditBureau.endpoint || "")}" placeholder="https://api.suaimobiliaria.com/credit-check" /></label>
+        <p class="empty-inline full">Status: ${escapeHtml(creditBureau.status || "Aguardando integracao oficial Serasa/SPC")}</p>
       </section>
 
       <div class="modal-actions">
@@ -4653,24 +5342,37 @@ function renderEditProfile(type, entity) {
             <label>Finalidade<input name="purpose" value="${escapeHtml(entity.purpose)}" required /></label>
             <label>Valor bruto<input name="grossValue" type="number" value="${escapeHtml(propertyGrossValue(entity) || 0)}" required /></label>
             <label>Valor liquido<input name="netValue" type="number" value="${escapeHtml(propertyNetValue(entity) || 0)}" required /></label>
-            <label class="full">Localizacao Google Maps<input name="googleLocation" value="${escapeHtml(propertyLocation(entity))}" placeholder="Cole o link do Google Maps ou digite o endereco completo" required /></label>
-            <section class="geo-grid full">
-              <div class="section-title">
-                <p class="eyebrow">Georreferencia</p>
-                <h3>Maps e cidades de atuacao</h3>
+            <section class="property-map-picker full">
+              <div class="map-search-panel">
+                <label>
+                  Localizacao do imovel
+                  <input name="googleLocation" value="${escapeHtml(propertyLocation(entity))}" placeholder="Pesquise o endereco ou cole o link do Google Maps" data-address-input required />
+                </label>
+                <div class="geo-actions">
+                  <button class="secondary-button" type="button" data-geocode-property>Buscar</button>
+                  <button class="secondary-button" type="button" data-open-property-map>Abrir mapa</button>
+                </div>
               </div>
-              <label>Latitude<input name="latitude" type="number" step="0.000001" value="${escapeHtml(entity.latitude || "")}" /></label>
-              <label>Longitude<input name="longitude" type="number" step="0.000001" value="${escapeHtml(entity.longitude || "")}" /></label>
-              <label>Cidade detectada<input name="city" value="${escapeHtml(entity.city || "")}" /></label>
-              <label>Bairro/regiao<input name="district" value="${escapeHtml(entity.district || "")}" /></label>
-              <label class="full">Endereco formatado<input name="formattedAddress" value="${escapeHtml(entity.formattedAddress || propertyLocation(entity))}" /></label>
-              <label class="full">Link do Google Maps<input name="googleMapsUrl" type="url" value="${escapeHtml(entity.googleMapsUrl || "")}" /></label>
-              <input name="googlePlaceId" type="hidden" value="${escapeHtml(entity.googlePlaceId || "")}" />
+              <div class="map-canvas" data-property-map-picker>
+                <iframe title="Mapa do imovel" loading="lazy" referrerpolicy="no-referrer-when-downgrade" data-map-preview src="${escapeHtml(propertyGoogleMapsEmbed(entity))}"></iframe>
+                <div class="map-empty-hint">Pesquise um endereco para posicionar o imovel no mapa.</div>
+              </div>
+              <div class="map-selected-address" data-map-selected-address>${escapeHtml(entity.formattedAddress || propertyLocation(entity) || "Nenhum endereco selecionado.")}</div>
+              <div class="map-hidden-fields">
+                <input name="latitude" type="hidden" value="${escapeHtml(entity.latitude || "")}" />
+                <input name="longitude" type="hidden" value="${escapeHtml(entity.longitude || "")}" />
+                <input name="city" type="hidden" value="${escapeHtml(entity.city || "")}" />
+                <input name="district" type="hidden" value="${escapeHtml(entity.district || "")}" />
+                <input name="formattedAddress" type="hidden" value="${escapeHtml(entity.formattedAddress || propertyLocation(entity))}" />
+                <input name="googleMapsUrl" type="hidden" value="${escapeHtml(entity.googleMapsUrl || "")}" />
+                <input name="googlePlaceId" type="hidden" value="${escapeHtml(entity.googlePlaceId || "")}" />
+              </div>
             </section>
             <label>Quartos<input name="rooms" type="number" value="${escapeHtml(entity.rooms || 0)}" /></label>
             <label>Area<input name="area" type="number" value="${escapeHtml(entity.area || 0)}" /></label>
             <label>Area de lazer?<select name="leisureArea"><option value="Nao" ${entity.leisureArea !== "Sim" ? "selected" : ""}>Nao</option><option value="Sim" ${entity.leisureArea === "Sim" ? "selected" : ""}>Sim</option></select></label>
             <label>Piscina?<select name="pool"><option value="Nao" ${entity.pool !== "Sim" ? "selected" : ""}>Nao</option><option value="Sim" ${entity.pool === "Sim" ? "selected" : ""}>Sim</option></select></label>
+            <label>Aceita pet?<select name="acceptsPet"><option value="Nao" ${entity.acceptsPet !== "Sim" ? "selected" : ""}>Nao</option><option value="Sim" ${entity.acceptsPet === "Sim" ? "selected" : ""}>Sim</option></select></label>
             <label>Garagem?<select name="garage"><option value="Nao" ${entity.garage !== "Sim" ? "selected" : ""}>Nao</option><option value="Sim" ${entity.garage === "Sim" ? "selected" : ""}>Sim</option></select></label>
             <label>Vagas de garagem<input name="garageSpaces" type="number" value="${escapeHtml(entity.garageSpaces || 0)}" /></label>
             ${renderPropertyPhotoEditor(entity)}
@@ -4837,12 +5539,51 @@ document.addEventListener("click", (event) => {
   const publicPropertyTrigger = event.target.closest("[data-public-property]");
   if (publicPropertyTrigger && !event.target.closest("a")) {
     event.preventDefault();
+    state.publicDetailPhotoIndex = 0;
     renderPublicPropertyDetail(publicPropertyTrigger.dataset.publicProperty);
     return;
   }
 
   if (event.target.closest("[data-close-public-property]")) {
     document.querySelector("#public-property-modal").hidden = true;
+    return;
+  }
+
+  const detailPhotoButton = event.target.closest("[data-public-detail-photo]");
+  if (detailPhotoButton) {
+    event.preventDefault();
+    event.stopPropagation();
+    const property = findProperty(detailPhotoButton.dataset.publicPropertyId);
+    const total = property?.photos?.length || 0;
+    if (total) {
+      state.publicDetailPhotoIndex =
+        detailPhotoButton.dataset.publicDetailPhoto === "next"
+          ? (state.publicDetailPhotoIndex + 1) % total
+          : (state.publicDetailPhotoIndex - 1 + total) % total;
+      renderPublicPropertyDetail(property.id);
+    }
+    return;
+  }
+
+  const detailPhotoThumb = event.target.closest("[data-public-detail-thumb]");
+  if (detailPhotoThumb) {
+    event.preventDefault();
+    event.stopPropagation();
+    state.publicDetailPhotoIndex = Number(detailPhotoThumb.dataset.publicDetailThumb || 0);
+    renderPublicPropertyDetail(detailPhotoThumb.dataset.publicPropertyId);
+    return;
+  }
+
+  const openPublicPhoto = event.target.closest("[data-open-public-photo]");
+  if (openPublicPhoto) {
+    event.preventDefault();
+    event.stopPropagation();
+    openPublicPhotoLightbox(openPublicPhoto.dataset.openPublicPhoto);
+    return;
+  }
+
+  if (event.target.closest("[data-close-public-photo]") || event.target.id === "public-photo-lightbox") {
+    document.querySelector("#public-photo-lightbox").hidden = true;
     return;
   }
 
@@ -5143,6 +5884,7 @@ document.querySelector("#property-form").addEventListener("submit", (event) => {
   property.available = true;
   property.featured = false;
   property.price = property.netValue || property.grossValue || "";
+  property.city = property.city || propertyCityValue(property);
   property.photos = [...state.selectedPropertyPhotos];
   property.documents = [...state.selectedPropertyDocs];
   state.properties.unshift(property);
@@ -5697,6 +6439,104 @@ document.addEventListener("click", (event) => {
     return;
   }
 
+  if (event.target.closest("[data-vitrine-back]")) {
+    setView(state.lastInternalView || "painel");
+    return;
+  }
+
+  const selectVitrineBlock = event.target.closest("[data-select-vitrine-block]");
+  if (selectVitrineBlock) {
+    state.vitrineActiveBlock = selectVitrineBlock.dataset.selectVitrineBlock;
+    renderVitrineEditor();
+    return;
+  }
+
+  const toggleVitrineBlock = event.target.closest("[data-toggle-vitrine-block]");
+  if (toggleVitrineBlock) {
+    const site = siteConfig();
+    const block = toggleVitrineBlock.dataset.toggleVitrineBlock;
+    site.blockVisibility[block] = site.blockVisibility[block] === false;
+    saveAll();
+    renderPublicProperties();
+    renderVitrineEditor();
+    showToast(site.blockVisibility[block] === false ? "Bloco ocultado no site." : "Bloco exibido no site.");
+    return;
+  }
+
+  const moveVitrineBlock = event.target.closest("[data-move-vitrine-block]");
+  if (moveVitrineBlock) {
+    const site = siteConfig();
+    const block = moveVitrineBlock.dataset.vitrineBlockId;
+    const index = site.blockOrder.indexOf(block);
+    const direction = moveVitrineBlock.dataset.moveVitrineBlock === "up" ? -1 : 1;
+    const nextIndex = index + direction;
+    if (index >= 0 && nextIndex >= 0 && nextIndex < site.blockOrder.length) {
+      [site.blockOrder[index], site.blockOrder[nextIndex]] = [site.blockOrder[nextIndex], site.blockOrder[index]];
+      saveAll();
+      renderVitrineEditor();
+      showToast("Ordem do bloco atualizada.");
+    }
+    return;
+  }
+
+  const vitrineDevice = event.target.closest("[data-vitrine-device]");
+  if (vitrineDevice) {
+    state.vitrineDevice = vitrineDevice.dataset.vitrineDevice;
+    renderVitrineEditor();
+    return;
+  }
+
+  const addVitrineText = event.target.closest("[data-add-vitrine-text]");
+  if (addVitrineText) {
+    const textPanel = addVitrineText.closest("[data-vitrine-text-form]");
+    const title = textPanel?.querySelector("[name='title']")?.value.trim() || "";
+    const subtitle = textPanel?.querySelector("[name='subtitle']")?.value.trim() || "";
+    if (!title && !subtitle) {
+      showToast("Informe um titulo ou texto para adicionar.");
+      return;
+    }
+    state.company.site.textBlocks = [...(state.company.site.textBlocks || []), { id: createId("site-text"), title, subtitle }];
+    saveAll();
+    renderPublicEditorContent();
+    renderVitrineEditor();
+    showToast("Texto adicionado a vitrine.");
+    return;
+  }
+
+  const removeVitrineMedia = event.target.closest("[data-remove-vitrine-media]");
+  if (removeVitrineMedia) {
+    state.company.site.media = (state.company.site.media || []).filter((_, index) => index !== Number(removeVitrineMedia.dataset.removeVitrineMedia));
+    saveAll();
+    renderVitrineEditor();
+    showToast("Midia removida da vitrine.");
+    return;
+  }
+
+  const removeVitrineText = event.target.closest("[data-remove-vitrine-text]");
+  if (removeVitrineText) {
+    state.company.site.textBlocks = (state.company.site.textBlocks || []).filter((_, index) => index !== Number(removeVitrineText.dataset.removeVitrineText));
+    saveAll();
+    renderVitrineEditor();
+    showToast("Texto removido da vitrine.");
+    return;
+  }
+
+  const geocodeButton = event.target.closest("[data-geocode-property]");
+  if (geocodeButton) {
+    geocodePropertyForm(geocodeButton.closest("form"));
+    return;
+  }
+
+  const openPropertyMapButton = event.target.closest("[data-open-property-map]");
+  if (openPropertyMapButton) {
+    const form = openPropertyMapButton.closest("form");
+    const lat = form?.querySelector("[name='latitude']")?.value;
+    const lng = form?.querySelector("[name='longitude']")?.value;
+    const address = form?.querySelector("[name='formattedAddress']")?.value || form?.querySelector("[name='googleLocation']")?.value;
+    window.open(lat && lng ? googleMapsLink(`${lat},${lng}`) : googleMapsLink(address), "_blank", "noopener");
+    return;
+  }
+
   if (event.target.matches("[data-restore-default-templates]")) {
     if (!isAdmin()) {
       showToast("Somente administrador pode restaurar modelos padrao.");
@@ -5976,6 +6816,12 @@ document.addEventListener("click", (event) => {
     return;
   }
 
+  const openDocumentButton = event.target.closest("[data-open-document]");
+  if (openDocumentButton) {
+    openStoredDocument(openDocumentButton.dataset.documentType, openDocumentButton.dataset.openDocument, openDocumentButton.dataset.documentEntity);
+    return;
+  }
+
   const removeDocumentButton = event.target.closest("[data-remove-document]");
   if (removeDocumentButton) {
     const entity = documentEntity(removeDocumentButton.dataset.documentType, removeDocumentButton.dataset.documentEntity);
@@ -6002,6 +6848,30 @@ document.addEventListener("click", (event) => {
   if (tab) {
     state.activeProfileTab = tab.dataset.profileTab;
     renderProfile();
+    return;
+  }
+
+  const authorizeCreditCheck = event.target.closest("[data-authorize-credit-check]");
+  if (authorizeCreditCheck) {
+    if (!requirePermission("Clientes", "registrar autorizacao de consulta")) return;
+    const client = findClient(authorizeCreditCheck.dataset.authorizeCreditCheck);
+    if (!client) return;
+    client.creditCheck = {
+      ...(client.creditCheck || {}),
+      authorized: true,
+      authorizedAt: new Date().toISOString(),
+      status: client.creditCheck?.status || "Autorizado",
+    };
+    saveAll();
+    renderProfile();
+    showToast("Autorizacao de consulta registrada.");
+    return;
+  }
+
+  const runCreditCheckButton = event.target.closest("[data-run-credit-check]");
+  if (runCreditCheckButton) {
+    if (!requirePermission("Clientes", "consultar CPF")) return;
+    runClientCreditCheck(runCreditCheckButton.dataset.runCreditCheck);
     return;
   }
 
@@ -6130,6 +7000,17 @@ document.addEventListener("change", async (event) => {
     return;
   }
 
+  const vitrineMediaInput = event.target.closest("[data-vitrine-media-upload]");
+  if (vitrineMediaInput) {
+    const files = await readFiles(vitrineMediaInput, 8);
+    state.company.site.media = [...(state.company.site.media || []), ...files].slice(0, 12);
+    saveAll();
+    renderVitrineEditor();
+    showToast("Midia adicionada a vitrine.");
+    vitrineMediaInput.value = "";
+    return;
+  }
+
   const photoInput = event.target.closest("[data-photo-upload]");
   if (photoInput && state.activeProfile) {
     const files = await readFiles(photoInput, photoInput.dataset.photoUpload === "property" ? 8 : 1, true);
@@ -6151,6 +7032,24 @@ document.addEventListener("change", async (event) => {
 });
 
 document.addEventListener("input", (event) => {
+  const addressInput = event.target.closest("[data-address-input]");
+  if (addressInput) {
+    const form = addressInput.closest("form");
+    const coordinates = coordinatesFromText(addressInput.value);
+    if (coordinates) {
+      fillAddressFields(form, {
+        formattedAddress: addressInput.value,
+        latitude: coordinates.latitude,
+        longitude: coordinates.longitude,
+      });
+      initPropertyMapPicker(form);
+    } else {
+      updateMapPreview(form);
+      updateMapSelectedAddress(form);
+    }
+    return;
+  }
+
   const documentLabelInput = event.target.closest("[data-document-label]");
   if (documentLabelInput) {
     const entity = documentEntity(documentLabelInput.dataset.documentType, documentLabelInput.dataset.documentEntity);
@@ -6170,6 +7069,16 @@ document.addEventListener("input", (event) => {
       photo.label = photoLabelInput.value;
       saveAll();
       render();
+    }
+    return;
+  }
+
+  const vitrineMediaLabel = event.target.closest("[data-vitrine-media-label]");
+  if (vitrineMediaLabel) {
+    const media = state.company.site.media?.[Number(vitrineMediaLabel.dataset.vitrineMediaLabel)];
+    if (media) {
+      media.label = vitrineMediaLabel.value;
+      saveAll();
     }
     return;
   }
@@ -6435,6 +7344,43 @@ document.addEventListener("submit", async (event) => {
     return;
   }
 
+  const vitrineForm = event.target.closest("[data-vitrine-form]");
+  if (vitrineForm) {
+    event.preventDefault();
+    if (!canOpenView("vitrine")) {
+      showToast("Seu usuario nao tem permissao para editar a vitrine.");
+      return;
+    }
+    const data = collectForm(vitrineForm);
+    state.company.site = {
+      ...(state.company.site || {}),
+      model: data.model || "executivo",
+      layout: data.layout || "imersivo",
+      heroEyebrow: data.heroEyebrow || state.company.site?.heroEyebrow || "Registro e regiao",
+      heroTitle: data.heroTitle || state.company.site?.heroTitle || state.company.name || "Regis Imobiliaria",
+      aboutText: data.aboutText || state.company.site?.aboutText || "",
+      featuredText: data.featuredText || state.company.site?.featuredText || "",
+      searchPlaceholder: data.searchPlaceholder || state.company.site?.searchPlaceholder || "Cidade, bairro, tipo ou codigo",
+    };
+    saveAll();
+    renderPublicProperties();
+    renderVitrineEditor();
+    showToast("Layout da vitrine salvo.");
+    return;
+  }
+
+  const vitrineTextForm = event.target.closest("[data-vitrine-text-form]");
+  if (vitrineTextForm) {
+    event.preventDefault();
+    const data = collectForm(vitrineTextForm);
+    if (!data.title && !data.subtitle) return;
+    state.company.site.textBlocks = [...(state.company.site.textBlocks || []), { id: createId("site-text"), title: data.title || "", subtitle: data.subtitle || "" }];
+    saveAll();
+    renderVitrineEditor();
+    showToast("Texto adicionado a vitrine.");
+    return;
+  }
+
   const companyForm = event.target.closest("[data-company-form]");
   if (companyForm) {
     event.preventDefault();
@@ -6511,6 +7457,10 @@ document.addEventListener("submit", async (event) => {
         geocoding: "Sim",
         mapVisibility: data.mapsVisibility || "Aproximada",
         status: data.mapsApiKey ? "Chave informada; pronto para carregar Places/Geocoding" : "Aguardando chave Google Maps",
+      },
+      creditBureau: {
+        endpoint: data.creditBureauEndpoint || "",
+        status: data.creditBureauEndpoint ? "Endpoint Serasa/SPC configurado" : "Aguardando integracao oficial Serasa/SPC",
       },
     };
     state.company.whatsapp = {
@@ -6646,6 +7596,7 @@ document.addEventListener("submit", async (event) => {
 
   if (type === "property") {
     data.price = data.netValue || data.grossValue || "";
+    data.city = data.city || propertyCityValue(data) || entity.city || "";
   }
 
   Object.assign(entity, data);
