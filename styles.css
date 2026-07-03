@@ -2256,6 +2256,40 @@ textarea:focus {
   gap: 18px;
 }
 
+.vitrine-coming-soon {
+  min-height: calc(100vh - 72px);
+  place-items: center;
+  padding: 32px;
+  background:
+    linear-gradient(135deg, rgba(52, 49, 111, 0.92), rgba(31, 36, 51, 0.94)),
+    #1f2433;
+  color: #fff;
+  text-align: center;
+}
+
+.vitrine-coming-soon > div {
+  max-width: 680px;
+  display: grid;
+  gap: 12px;
+}
+
+.vitrine-coming-soon h2,
+.vitrine-coming-soon p {
+  margin: 0;
+  color: #fff;
+}
+
+.vitrine-coming-soon h2 {
+  font-size: clamp(2.2rem, 5vw, 4.8rem);
+  line-height: 0.95;
+}
+
+.vitrine-coming-soon p {
+  color: rgba(255, 255, 255, 0.78);
+  font-weight: 800;
+  line-height: 1.55;
+}
+
 .vitrine-form {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
