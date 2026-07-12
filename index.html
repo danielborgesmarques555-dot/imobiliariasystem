@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Regis Imobiliaria</title>
-    <link rel="stylesheet" href="styles.css?v=20260703a" />
+    <link rel="stylesheet" href="styles.css?v=20260712a" />
   </head>
   <body class="public-mode">
     <section class="site-shell" id="site-publico" aria-label="Site publico da imobiliaria">
@@ -262,11 +262,11 @@
               </label>
               <label>
                 Valor bruto
-                <input name="grossValue" type="number" min="0" step="1000" placeholder="Valor pedido pelo proprietario" required />
+                <input name="grossValue" type="number" min="0" step="0.01" placeholder="Valor pedido pelo proprietario" required />
               </label>
               <label>
                 Valor liquido
-                <input name="netValue" type="number" min="0" step="1000" placeholder="Valor final para anuncio/contrato" required />
+                <input name="netValue" type="number" min="0" step="0.01" placeholder="Valor final para anuncio/contrato" required />
               </label>
               <section class="property-map-picker full">
                 <div class="map-search-panel">
@@ -1014,6 +1014,6 @@
       </section>
     </div>
     <script src="assets/jspdf.browser.js?v=20260604a"></script>
-    <script src="script.js?v=20260630a"></script>
+    <script src="script.js?v=20260712a"></script>
   </body>
 </html>

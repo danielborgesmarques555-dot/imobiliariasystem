@@ -1374,7 +1374,7 @@ h3 {
 
 .dashboard-report-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 16px;
 }
 
@@ -1424,7 +1424,14 @@ h3 {
 }
 
 .dashboard-report-lines b {
+  max-width: 46%;
   color: var(--blue-dark);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-report-lines span {
+  overflow-wrap: anywhere;
 }
 
 .team-layout {
@@ -2016,6 +2023,15 @@ textarea:focus {
   box-shadow: 0 30px 80px rgba(20, 22, 44, 0.32);
 }
 
+.payment-modal {
+  width: min(520px, 100%);
+  max-height: min(760px, calc(100vh - 48px));
+  overflow: auto;
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 30px 80px rgba(20, 22, 44, 0.32);
+}
+
 .modal-header {
   position: sticky;
   top: 0;
@@ -2031,6 +2047,30 @@ textarea:focus {
 
 .modal-body {
   padding: 22px;
+}
+
+.payment-form {
+  display: grid;
+  gap: 16px;
+  padding: 22px;
+}
+
+.payment-summary {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f7f9fc;
+}
+
+.payment-summary strong {
+  color: var(--blue-dark);
+}
+
+.payment-summary span {
+  color: var(--muted);
+  font-weight: 800;
 }
 
 .profile-tabs {
@@ -2087,6 +2127,23 @@ textarea:focus {
 }
 
 .detail-list strong {
+  color: var(--blue-dark);
+}
+
+.inline-link-button {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--green-dark);
+  font: inherit;
+  font-weight: 900;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.inline-link-button:hover {
   color: var(--blue-dark);
 }
 
@@ -3419,6 +3476,22 @@ body.vitrine-mode .view {
   height: 100%;
   display: block;
   object-fit: cover;
+}
+
+.profile-photo-open {
+  width: 100%;
+  height: 100%;
+  display: block;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+
+.profile-photo-open:focus-visible,
+.public-photo-open:focus-visible {
+  outline: 3px solid rgba(112, 155, 34, 0.42);
+  outline-offset: -3px;
 }
 
 .profile-carousel .empty-cover {

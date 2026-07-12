@@ -956,7 +956,7 @@ function readImageFile(file) {
     reader.addEventListener("load", () => {
       const image = new Image();
       image.addEventListener("load", () => {
-        const maxSize = 1100;
+        const maxSize = 2200;
         const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
         const canvas = document.createElement("canvas");
         canvas.width = Math.round(image.width * scale);
@@ -968,7 +968,7 @@ function readImageFile(file) {
           label: file.name,
           type: "image/jpeg",
           size: file.size,
-          data: canvas.toDataURL("image/jpeg", 0.72),
+          data: canvas.toDataURL("image/jpeg", 0.9),
         });
       });
       image.addEventListener("error", reject);
@@ -1650,6 +1650,16 @@ function renderDashboardReports() {
   const rentContracts = state.contracts.filter((contract) => contract.type === "Locacao");
   const saleContracts = state.contracts.filter((contract) => contract.type === "Compra");
   const oneOffContracts = state.contracts.filter((contract) => contract.type === "Avulso");
+  const upcomingAppointments = state.appointments
+    .filter((appointment) => {
+      const status = appointmentComputedStatus(appointment);
+      const days = daysUntilDate(appointment.date);
+      return !["Concluido", "Cancelado"].includes(status) && days !== null && days >= 0 && days <= 7;
+    })
+    .sort((a, b) => appointmentTimestamp(a).localeCompare(appointmentTimestamp(b)));
+  const invoiceAlerts = state.invoices
+    .filter((invoice) => ["Pendente", "Quase vencendo"].includes(invoiceComputedStatus(invoice)))
+    .sort((a, b) => String(a.dueDate || "9999-12-31").localeCompare(String(b.dueDate || "9999-12-31")));
 
   const reportCards = [
     {
@@ -1699,6 +1709,30 @@ function renderDashboardReports() {
         ["Venda", saleContracts.length],
         ["Avulso", oneOffContracts.length],
       ],
+    },
+    {
+      title: "Lembretes de visitas",
+      total: upcomingAppointments.length,
+      detail: "proximos 7 dias",
+      rows: upcomingAppointments.length
+        ? upcomingAppointments.slice(0, 5).map((appointment) => {
+            const property = findProperty(appointment.propertyId);
+            const date = `${formatDate(appointment.date) || appointment.date || "Sem data"} ${appointment.time || ""}`.trim();
+            return [property?.title || appointment.type || "Visita", date];
+          })
+        : [["Agenda", "Sem alertas"]],
+    },
+    {
+      title: "Faturas em alerta",
+      total: invoiceAlerts.length,
+      detail: "vencidas ou quase vencendo",
+      rows: invoiceAlerts.length
+        ? invoiceAlerts.slice(0, 5).map((invoice) => {
+            const client = findClient(invoice.clientId);
+            const label = `${client?.name || "Cliente"} - ${formatter.format(Number(invoice.amount || 0))}`;
+            return [label, formatDate(invoice.dueDate) || invoice.dueDate || "Sem data"];
+          })
+        : [["Cobranca", "Sem alertas"]],
     },
   ];
 
@@ -3070,14 +3104,18 @@ function openPublicPhotoLightbox(propertyId) {
   const photos = Array.isArray(property.photos) ? property.photos : [];
   const photo = photos[state.publicDetailPhotoIndex || 0];
   const src = getPhotoSrc(photo);
+  openImageLightbox(src, photo?.label || property.title || "Foto do imovel", property.title || "Foto do imovel");
+}
+
+function openImageLightbox(src, captionText = "Foto", altText = "Foto ampliada") {
   if (!src) return;
   const lightbox = document.querySelector("#public-photo-lightbox");
   const image = document.querySelector("#public-photo-lightbox-image");
   const caption = document.querySelector("#public-photo-lightbox-caption");
   if (!lightbox || !image) return;
   image.src = src;
-  image.alt = `Foto de ${property.title}`;
-  if (caption) caption.textContent = photo?.label || property.title || "Foto do imovel";
+  image.alt = altText;
+  if (caption) caption.textContent = captionText;
   lightbox.hidden = false;
 }
 
@@ -3329,6 +3367,9 @@ function renderInvoiceProfile(invoice) {
       ${invoice.interestRate ? `<p><strong>Juros:</strong> ${escapeHtml(invoice.interestRate)}%</p>` : ""}
       ${invoice.reference ? `<p><strong>Mes de referencia:</strong> ${escapeHtml(invoice.reference)}</p>` : ""}
       ${invoice.contractEndReference ? `<p><strong>Ultimo mes do contrato:</strong> ${escapeHtml(invoice.contractEndReference)}</p>` : ""}
+      ${invoice.paymentMethod ? `<p><strong>Forma de pagamento:</strong> ${escapeHtml(invoice.paymentMethod)}</p>` : ""}
+      ${invoice.paymentNotes ? `<p><strong>Observacao do pagamento:</strong> ${escapeHtml(invoice.paymentNotes)}</p>` : ""}
+      ${invoice.paidAt ? `<p><strong>Pagamento registrado em:</strong> ${escapeHtml(formatDate(invoice.paidAt.slice(0, 10)) || invoice.paidAt)}</p>` : ""}
       ${invoice.whatsappTo ? `<p><strong>WhatsApp:</strong> ${escapeHtml(invoice.whatsappTo)}</p>` : ""}
       ${invoice.whatsappMessage ? `<p><strong>Mensagem:</strong> ${escapeHtml(invoice.whatsappMessage)}</p>` : ""}
       <p><strong>Descricao:</strong> ${escapeHtml(invoice.description || "Sem descricao.")}</p>
@@ -3890,7 +3931,11 @@ function hasPositiveNumber(value) {
 
 function renderPropertyDetails(entity, owner) {
   const details = [
-    `<p><strong>Proprietario:</strong> ${escapeHtml(owner.name || "Nao informado")}</p>`,
+    `<p><strong>Proprietario:</strong> ${
+      owner.id
+        ? `<button class="inline-link-button" type="button" data-open-owner-profile="${owner.id}">${escapeHtml(owner.name || "Nao informado")}</button>`
+        : escapeHtml(owner.name || "Nao informado")
+    }</p>`,
     `<p><strong>CPF do proprietario:</strong> ${escapeHtml(owner.cpf || "Nao informado")}</p>`,
     `<p><strong>${escapeHtml(owner.contact1Name || "Contato 1")}:</strong> ${escapeHtml(owner.contact1 || "Nao informado")}</p>`,
     owner.contact2 ? `<p><strong>${escapeHtml(owner.contact2Name || "Contato 2")}:</strong> ${escapeHtml(owner.contact2)}</p>` : "",
@@ -3936,7 +3981,9 @@ function renderPropertyCarousel(property) {
     <div class="profile-carousel">
       ${
         src
-          ? `<img src="${src}" alt="${escapeHtml(photo.label || "Foto do imovel")}">
+          ? `<button class="profile-photo-open" type="button" data-open-profile-photo="${safeIndex}" aria-label="Abrir foto ampliada">
+               <img src="${src}" alt="${escapeHtml(photo.label || "Foto do imovel")}">
+             </button>
              <span class="photo-count">${escapeHtml(photo.label || (safeIndex === 0 ? "Principal" : `Foto ${safeIndex + 1}`))}</span>`
           : '<div class="empty-cover">Sem foto</div>'
       }
@@ -3951,6 +3998,14 @@ function renderPropertyCarousel(property) {
       }
     </div>
   `;
+}
+
+function refreshPropertyCarousel() {
+  if (state.activeProfile?.type !== "property") return;
+  const property = findProperty(state.activeProfile.id);
+  const carousel = document.querySelector(".profile-carousel");
+  if (!property || !carousel) return;
+  carousel.outerHTML = renderPropertyCarousel(property);
 }
 
 function renderPropertyPhotoEditor(property) {
@@ -4007,6 +4062,15 @@ function renderPhotoManager(type, entity, title) {
       </div>
     </section>
   `;
+}
+
+function refreshPhotoManager() {
+  if (!["property", "client"].includes(state.activeProfile?.type)) return;
+  const entity = activeEntity();
+  const manager = document.querySelector(".photo-manager");
+  if (!entity || !manager) return;
+  const title = state.activeProfile.type === "property" ? "Fotos do imovel" : "Fotos do cliente";
+  manager.outerHTML = renderPhotoManager(state.activeProfile.type, entity, title);
 }
 
 function renderClientProfilePhoto(client) {
@@ -5165,6 +5229,9 @@ function invoicePdfLines(invoice, title = "FATURA DE COBRANCA") {
     `Valor da fatura: ${formatter.format(Number(invoice.amount || 0))}`,
     invoice.installment ? `Parcela: ${invoice.installment}` : "",
     invoice.chargeType ? `Tipo de cobranca: ${invoice.chargeType}` : "",
+    invoice.paymentMethod ? `Forma de pagamento: ${invoice.paymentMethod}` : "",
+    invoice.paidAt ? `Pagamento registrado em: ${formatDate(invoice.paidAt.slice(0, 10)) || invoice.paidAt}` : "",
+    invoice.paymentNotes ? `Observacao do pagamento: ${invoice.paymentNotes}` : "",
     "",
     "DESCRICAO E OBSERVACOES",
     invoice.description || "Sem observacoes adicionais.",
@@ -5189,14 +5256,7 @@ function downloadInvoicePdf(invoiceId) {
   const lines = invoicePdfLines(invoice);
   const pdf = buildBasicPdf(lines);
   const blob = new Blob([pdf], { type: "application/pdf" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `${invoiceFileName(invoice, client)}.pdf`;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  downloadBlob(blob, `${invoiceFileName(invoice, client)}.pdf`);
 }
 
 function downloadInvoiceBookletPdf(invoiceId) {
@@ -5224,14 +5284,76 @@ function downloadInvoiceBookletPdf(invoiceId) {
   ]);
   const pdf = buildBasicPdf(lines);
   const blob = new Blob([pdf], { type: "application/pdf" });
+  downloadBlob(blob, `${slugify(`carne-${invoice.category}-${client?.name || "cliente"}-${invoice.bookletId}`) || "carne"}.pdf`);
+}
+
+function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `${slugify(`carne-${invoice.category}-${client?.name || "cliente"}-${invoice.bookletId}`) || "carne"}.pdf`;
+  link.download = filename;
+  link.rel = "noopener";
+  link.style.display = "none";
   document.body.append(link);
   link.click();
   link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  window.setTimeout(() => URL.revokeObjectURL(url), 15000);
+}
+
+function openInvoicePaymentModal(invoiceId) {
+  const invoice = state.invoices.find((item) => item.id === invoiceId);
+  if (!invoice) return;
+  let modal = document.querySelector("#payment-modal");
+  if (!modal) {
+    modal = document.createElement("div");
+    modal.className = "modal-backdrop";
+    modal.id = "payment-modal";
+    modal.hidden = true;
+    document.body.append(modal);
+  }
+  const client = findClient(invoice.clientId);
+  modal.innerHTML = `
+    <section class="payment-modal" role="dialog" aria-modal="true" aria-labelledby="payment-modal-title">
+      <header class="modal-header">
+        <div>
+          <p class="eyebrow">Fatura</p>
+          <h3 id="payment-modal-title">Registrar pagamento</h3>
+        </div>
+        <button class="icon-button" type="button" data-close-payment-modal aria-label="Fechar">x</button>
+      </header>
+      <form class="payment-form" data-payment-form="${escapeHtml(invoice.id)}">
+        <div class="payment-summary">
+          <strong>${escapeHtml(client?.name || "Cliente nao informado")}</strong>
+          <span>${formatter.format(Number(invoice.amount || 0))} - vence ${escapeHtml(formatDate(invoice.dueDate) || invoice.dueDate || "sem data")}</span>
+        </div>
+        <label>
+          Forma de pagamento
+          <select name="paymentMethod" required>
+            <option value="">Selecione</option>
+            <option value="Pix">Pix</option>
+            <option value="Dinheiro">Dinheiro</option>
+            <option value="Cartao de credito">Cartao de credito</option>
+            <option value="Cartao de debito">Cartao de debito</option>
+            <option value="Dois meios / misto">Dois meios / misto</option>
+          </select>
+        </label>
+        <label>
+          Observacao
+          <textarea name="paymentNotes" rows="3" placeholder="Ex.: parte em Pix e parte no cartao"></textarea>
+        </label>
+        <div class="form-actions">
+          <button class="submit-button" type="submit">Salvar pagamento</button>
+          <button class="secondary-button" type="button" data-close-payment-modal>Cancelar</button>
+        </div>
+      </form>
+    </section>
+  `;
+  modal.hidden = false;
+}
+
+function closeInvoicePaymentModal() {
+  const modal = document.querySelector("#payment-modal");
+  if (modal) modal.hidden = true;
 }
 
 function backupPayload() {
@@ -5340,8 +5462,8 @@ function renderEditProfile(type, entity) {
               ${(propertyTypes[entity.type] || []).map((subtype) => `<option value="${subtype}" ${subtype === entity.subtype ? "selected" : ""}>${subtype}</option>`).join("")}
             </select></label>
             <label>Finalidade<input name="purpose" value="${escapeHtml(entity.purpose)}" required /></label>
-            <label>Valor bruto<input name="grossValue" type="number" value="${escapeHtml(propertyGrossValue(entity) || 0)}" required /></label>
-            <label>Valor liquido<input name="netValue" type="number" value="${escapeHtml(propertyNetValue(entity) || 0)}" required /></label>
+            <label>Valor bruto<input name="grossValue" type="number" min="0" step="0.01" value="${escapeHtml(propertyGrossValue(entity) || 0)}" required /></label>
+            <label>Valor liquido<input name="netValue" type="number" min="0" step="0.01" value="${escapeHtml(propertyNetValue(entity) || 0)}" required /></label>
             <section class="property-map-picker full">
               <div class="map-search-panel">
                 <label>
@@ -6405,13 +6527,12 @@ document.addEventListener("click", (event) => {
     if (!requirePermission("Faturas", "registrar pagamento")) return;
     const invoice = state.invoices.find((item) => item.id === payInvoiceButton.dataset.payInvoice);
     if (!invoice || invoiceComputedStatus(invoice) === "Inativa" || invoiceComputedStatus(invoice) === "Aguardando") return;
-    invoice.status = "Paga";
-    invoice.paidAt = new Date().toISOString();
-    const releasedNext = releaseNextBookletInvoice(invoice);
-    saveAll();
-    render();
-    if (state.activeProfile?.type === "invoice") renderProfile();
-    showToast(releasedNext ? "Pagamento registrado. Proxima fatura liberada." : "Pagamento registrado.");
+    openInvoicePaymentModal(invoice.id);
+    return;
+  }
+
+  if (event.target.closest("[data-close-payment-modal]") || event.target.id === "payment-modal") {
+    closeInvoicePaymentModal();
     return;
   }
 
@@ -6670,6 +6791,13 @@ document.addEventListener("click", (event) => {
     return;
   }
 
+  const openOwnerProfileButton = event.target.closest("[data-open-owner-profile]");
+  if (openOwnerProfileButton) {
+    event.preventDefault();
+    openProfile("owner", openOwnerProfileButton.dataset.openOwnerProfile);
+    return;
+  }
+
   const card = event.target.closest("[data-profile-type][data-profile-id]");
   if (card) {
     openProfile(card.dataset.profileType, card.dataset.profileId);
@@ -6811,7 +6939,8 @@ document.addEventListener("click", (event) => {
     state.carouselIndex = Math.min(state.carouselIndex, Math.max((entity.photos || []).length - 1, 0));
     saveAll();
     render();
-    renderProfile("edit");
+    refreshPhotoManager();
+    refreshPropertyCarousel();
     showToast("Foto excluida.");
     return;
   }
@@ -6877,6 +7006,7 @@ document.addEventListener("click", (event) => {
 
   const carouselButton = event.target.closest("[data-carousel]");
   if (carouselButton && state.activeProfile?.type === "property") {
+    event.preventDefault();
     const property = findProperty(state.activeProfile.id);
     const total = property?.photos?.length || 0;
     if (total) {
@@ -6884,15 +7014,26 @@ document.addEventListener("click", (event) => {
         carouselButton.dataset.carousel === "next"
           ? (state.carouselIndex + 1) % total
           : (state.carouselIndex - 1 + total) % total;
-      renderProfile();
+      refreshPropertyCarousel();
     }
     return;
   }
 
   const carouselDot = event.target.closest("[data-carousel-dot]");
   if (carouselDot && state.activeProfile?.type === "property") {
+    event.preventDefault();
     state.carouselIndex = Number(carouselDot.dataset.carouselDot);
-    renderProfile();
+    refreshPropertyCarousel();
+    return;
+  }
+
+  const openProfilePhoto = event.target.closest("[data-open-profile-photo]");
+  if (openProfilePhoto && state.activeProfile?.type === "property") {
+    event.preventDefault();
+    const property = findProperty(state.activeProfile.id);
+    const index = Number(openProfilePhoto.dataset.openProfilePhoto || state.carouselIndex || 0);
+    const photo = property?.photos?.[index];
+    openImageLightbox(getPhotoSrc(photo), photo?.label || property?.title || "Foto do imovel", `Foto de ${property?.title || "imovel"}`);
     return;
   }
 
@@ -6983,7 +7124,8 @@ document.addEventListener("change", async (event) => {
     }
     saveAll();
     render();
-    renderProfile("edit");
+    refreshPhotoManager();
+    refreshPropertyCarousel();
     showToast("Fotos adicionadas.");
     return;
   }
@@ -7069,6 +7211,7 @@ document.addEventListener("input", (event) => {
       photo.label = photoLabelInput.value;
       saveAll();
       render();
+      refreshPropertyCarousel();
     }
     return;
   }
@@ -7135,11 +7278,37 @@ document.addEventListener("drop", (event) => {
   state.carouselIndex = toIndex;
   saveAll();
   render();
-  renderProfile("edit");
+  refreshPhotoManager();
+  refreshPropertyCarousel();
   showToast("Ordem das fotos atualizada.");
 });
 
 document.addEventListener("submit", async (event) => {
+  const paymentForm = event.target.closest("[data-payment-form]");
+  if (paymentForm) {
+    event.preventDefault();
+    if (!requirePermission("Faturas", "registrar pagamento")) return;
+    const invoice = state.invoices.find((item) => item.id === paymentForm.dataset.paymentForm);
+    if (!invoice || invoiceComputedStatus(invoice) === "Inativa" || invoiceComputedStatus(invoice) === "Aguardando") return;
+    const data = collectForm(paymentForm);
+    if (!data.paymentMethod) {
+      showToast("Selecione a forma de pagamento.");
+      return;
+    }
+    invoice.status = "Paga";
+    invoice.paidAt = new Date().toISOString();
+    invoice.paymentMethod = data.paymentMethod;
+    invoice.paymentNotes = data.paymentNotes || "";
+    invoice.paymentRegisteredBy = activeUser()?.name || "";
+    const releasedNext = releaseNextBookletInvoice(invoice);
+    saveAll();
+    closeInvoicePaymentModal();
+    render();
+    if (state.activeProfile?.type === "invoice") renderProfile();
+    showToast(releasedNext ? "Pagamento registrado. Proxima fatura liberada." : "Pagamento registrado.");
+    return;
+  }
+
   const rescissionModelForm = event.target.closest("[data-rescission-model-form]");
   if (rescissionModelForm) {
     event.preventDefault();
